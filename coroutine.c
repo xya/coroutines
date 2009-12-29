@@ -20,7 +20,7 @@ struct coroutine
 
 static coroutine_t current = NULL;
 
-static void *coroutine_switch(coroutine_t co, void *arg);
+extern void *coroutine_switch(coroutine_t co, void *arg);
 
 coroutine_t coroutine_current()
 {
@@ -57,6 +57,12 @@ coroutine_t coroutine_spawn(coroutine_func f)
     // create a coroutine for the function
     coroutine_t co;
     void *stack;
+    
+    if(!coroutine_current())
+    {
+        fprintf(stderr, "coroutine_spawn(): no coroutine is executing.\n");
+        return NULL;
+    }
     
     co = (coroutine_t)malloc(sizeof(struct coroutine));
     if(!co)
@@ -115,14 +121,4 @@ void *coroutine_resume(coroutine_t co, void *arg)
         return NULL;
     }
     return coroutine_switch(co, arg);
-}
-
-void *coroutine_switch(coroutine_t co, void *arg)
-{
-    (void)co;
-    (void)arg;
-    return NULL;
-    //save the current context (registers and arg)
-    //switch to coroutine 'co' (i.e., call co->pc)
-    //when rescheduled, restore the context and return the result
 }
