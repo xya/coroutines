@@ -1,0 +1,101 @@
+C coroutine experiment:
+
+coroutine *coroutine_spawn(coroutine_func f)
+    create a new stack
+    add the coroutine to the 'unstarted' list
+void *coroutine_yield(void *arg)
+    save the current context (registers and arg)
+    add the coroutine to the 'paused' list
+    execute the yield callback
+    when rescheduled, restore the context and return the result
+int coroutine_set_yield_callback(coroutine_yield_func f)
+void coroutine_resume(coroutine *co, void *arg)
+    if the coroutine is paused
+        remove the coroutine from the 'paused' list
+        switch the context to the coroutine (stack, registers)
+        return 'arg' from coroutine_yield()
+    otherwise
+        invoke the coroutine entry function with 'arg'
+int coroutine_run()
+    execute all 'unstarted' coroutines
+coroutine *coroutine_current()
+    return the currently executing coroutine
+
+void (*coroutine_func)(void *arg)
+    entry point for a coroutine
+void (*coroutine_yield_func)(coroutine *co, void *arg)
+    function called when a coroutine yields
+
+typedef struct
+{
+    int state;              // unstarted, running, paused, finished
+    coroutine_func entry;
+    void *stack_ptr;        // the coroutine's stack (i.e. used with ESP register)
+    void *pc;               // the coroutine's program counter
+    coroutine *caller;
+} coroutine;
+
+typedef struct
+{
+    coroutine_list *coroutines;
+    coroutine *current;
+} coroutine_process_state;
+
+or maybe:
+
+coroutine *coroutine_spawn(coroutine_func f, void *arg)
+    create a new stack
+    execute the coroutine until it yields
+void *coroutine_yield(void *arg)
+    save the current context (registers and arg)
+    switch to the calling coroutine
+    when rescheduled, restore the context and return the result
+void coroutine_resume(coroutine *co, void *arg)
+    switch the context to the coroutine (stack, registers)
+    return 'arg' from coroutine_yield()
+    does not return!
+coroutine *coroutine_current()
+    return the currently executing coroutine
+
+yet another way:
+
+coroutine *coroutine_spawn(coroutine_func f, void *arg, void **ret)
+    create a new stack
+    then similar to "coroutine_switch(new_coroutine, arg)"
+void *coroutine_yield(void *arg)
+    similar to "coroutine_switch(coroutine_current()->caller, arg)"
+void *coroutine_resume(coroutine *co, void *arg)
+    similar to "coroutine_switch(co, arg)"
+coroutine *coroutine_current()
+    return the currently executing coroutine
+void *coroutine_switch(coroutine *co, void *arg)
+    save the current context (registers and arg)
+    switch to coroutine 'co' (i.e., call co->pc)
+    when rescheduled, restore the context and return the result
+
+int main(int argc, char **argv)
+{
+    coroutine_main(pong, NULL);
+}
+
+void pong(void *arg)
+{
+    uintptr_t n = 1;
+    coroutine *co_ping = coroutine_spawn(ping, (void *)n, (void **)&n);
+    while(coroutine_alive(co_ping))
+    {
+        printf("pong! %i\n", n);
+        n = (uintptr_t)coroutine_resume(co_ping, (void *)n);
+    }
+}
+
+void ping(void *arg)
+{
+    uintptr_t n = (uintptr_t)arg;
+    if(n <= 10)
+    {
+        printf("ping! (%i)\n", n);
+        n++;
+        n = (uintptr_t)coroutine_yield((void *)n);
+    }
+}
