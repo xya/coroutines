@@ -39,8 +39,9 @@ coroutine_exit:
     popq %rdi
     movq 16(%rsi), %rsp     # restore the callers stack
     popq %rbp
-// TODO: call coroutine_exited() to free the stack and reap zombies
-    movl $3, (%rdi)         # dst->state = FINISHED
+    pushq %rsi
+    call coroutine_exited
+    popq %rsi
     movq $0, %rax
     jmp *8(%rsi)            # src->pc()
     

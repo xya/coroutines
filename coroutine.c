@@ -6,7 +6,7 @@ struct coroutine
 {
     int state;              // unstarted, running, paused, finished
     void *pc;               // the coroutine's program counter
-    void *stack_ptr;        // the coroutine's stack (i.e. used with ESP register)
+    void *stack;            // the coroutine's stack (i.e. used with ESP register)
     coroutine_t caller;     // the coroutine which resumed this one
     coroutine_func entry;
 };
@@ -19,6 +19,10 @@ struct coroutine
 #define COROUTINE_STACK_SIZE    4096
 
 coroutine_t current = NULL;
+int next_id = 0;
+
+void coroutine_incref(coroutine_t co);
+void coroutine_decref(coroutine_t co);
 
 extern void *coroutine_switch(coroutine_t dst, coroutine_t src, void *arg);
 
@@ -34,20 +38,28 @@ int coroutine_alive(coroutine_t co)
 
 void coroutine_main(coroutine_func f, void *arg)
 {
+    if(coroutine_current())
+    {
+        fprintf(stderr, "coroutine_main(): a coroutine is already executing.\n");
+        return;
+    }
+    
     // create a coroutine for the 'main' function
     coroutine_t co = (coroutine_t)malloc(sizeof(struct coroutine));
     co->state = STATE_RUNNING;
+    //co->id = next_id++;
     co->entry = f;
     co->pc = NULL;
     co->caller = NULL;
+    co->stack = NULL;
     current = co;
-    co->stack_ptr = NULL;
     
     // execute it
     co->entry(arg);
     
     // the coroutine finished
     co->state = STATE_FINISHED;
+    free(co);
     current = NULL;
 }
 
@@ -73,10 +85,11 @@ coroutine_t coroutine_spawn(coroutine_func f)
         return NULL;
     }
     co->state = STATE_UNSTARTED;
+    //co->id = next_id++;
     co->entry = f;
     co->pc = NULL;
     co->caller = NULL;
-    co->stack_ptr = stack + COROUTINE_STACK_SIZE; // stack grows downwards
+    co->stack = stack + COROUTINE_STACK_SIZE; // stack grows downwards
     return co;
 }
 
@@ -121,4 +134,20 @@ void *coroutine_resume(coroutine_t co, void *arg)
         return NULL;
     }
     return coroutine_switch(co, cur, arg);
+}
+
+void coroutine_exited(coroutine_t co)
+{
+    co->state = STATE_FINISHED;
+    //free(co->stack);
+    //free(co);
+    printf("coroutine exited\n");
+}
+
+void coroutine_incref(coroutine_t co)
+{
+}
+
+void coroutine_decref(coroutine_t co)
+{
 }
