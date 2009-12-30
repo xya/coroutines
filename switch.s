@@ -11,31 +11,36 @@ coroutine_switch:
     movq %rsi, 24(%rdi)     # dst->caller = src
     movl $2, (%rsi)         # src->state = PAUSED
     movq %rdi, current      # current = dst
-    
-    cmpl $0, (%rdi)
-    je coroutine_entry
+    cmpl $0, (%rdi)         # has the coroutine been started before?
+    je coroutine_enter
     
 // when rescheduled, restore the context and return the result 
 coroutine_do_resume:
     movl $1, (%rdi)         # dst->state = RUNNING
-    movq 16(%rdi), %rsp     # restore the dest coroutines stack
+    movq 16(%rdi), %rsp     # restore the dest coroutine`s stack
     popq %rbp               # restore rbp
     movq %rdx, %rax         # <return value> = arg
     jmp *8(%rdi)            # dst->pc()
             
 // run the dest coroutine (for the first time)
-coroutine_entry:
+coroutine_enter:
     movl $1, (%rdi)         # dst->state = RUNNING
-    movq 16(%rdi), %rsp     # switch to the dest coroutines stack
+    movq 16(%rdi), %rsp     # switch to the dest coroutine`s stack
     pushq %rdi
     pushq %rsi
     movq %rdi, %rax
     movq %rdx, %rdi
     call *32(%rax)          # dst->entry(arg)
+
+// the coroutine exited, switch back to its original caller
+// TODO: switch back to the last caller, in case it is different
+coroutine_exit:
     popq %rsi
     popq %rdi
     movq 16(%rsi), %rsp     # restore the callers stack
     popq %rbp
+// TODO: call coroutine_exited() to free the stack and reap zombies
     movl $3, (%rdi)         # dst->state = FINISHED
     movq $0, %rax
-    ret
+    jmp *8(%rsi)            # src->pc()
+    

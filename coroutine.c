@@ -47,7 +47,6 @@ void coroutine_main(coroutine_func f, void *arg)
     co->entry(arg);
     
     // the coroutine finished
-    printf("Main coroutine exited.\n");
     co->state = STATE_FINISHED;
     current = NULL;
 }
@@ -100,7 +99,6 @@ void *coroutine_yield(void *arg)
         fprintf(stderr, "coroutine_yield(): caller must be still alive.\n");
         return NULL;
     }
-    printf("yield(%p, %p, %p)\n", caller, cur, arg);
     return coroutine_switch(caller, cur, arg);
 }
 
@@ -122,6 +120,5 @@ void *coroutine_resume(coroutine_t co, void *arg)
         fprintf(stderr, "coroutine_resume(): callee coroutine must be still alive.\n");
         return NULL;
     }
-    printf("resume(%p, %p, %p)\n", co, cur, arg);
     return coroutine_switch(co, cur, arg);
 }
