@@ -20,7 +20,7 @@ struct coroutine
 
 coroutine_t current = NULL;
 
-extern void *coroutine_switch(coroutine_t dst, coroutine_t src, void *arg);
+extern void *coroutine_switch(coroutine_t co, void *arg);
 
 coroutine_t coroutine_current()
 {
@@ -109,40 +109,39 @@ void *coroutine_yield(void *arg)
         fprintf(stderr, "coroutine_yield(): caller must be still alive.\n");
         return NULL;
     }
-    return coroutine_switch(caller, cur, arg);
+    return coroutine_switch(caller, arg);
 }
 
 void *coroutine_resume(coroutine_t co, void *arg)
 {
-    coroutine_t cur = coroutine_current();
-    if(!cur)
+    if(!coroutine_current())
     {
         fprintf(stderr, "coroutine_resume(): no coroutine is executing.\n");
         return NULL;
     }
     else if(!co)
     {
-        fprintf(stderr, "coroutine_resume(): callee coroutine must not be null.\n");
+        fprintf(stderr, "coroutine_resume(): coroutine 'co' must not be null.\n");
         return NULL;
     }
     else if(!coroutine_alive(co))
     {
-        fprintf(stderr, "coroutine_resume(): callee coroutine must be still alive.\n");
+        fprintf(stderr, "coroutine_resume(): coroutine 'co' must be still alive.\n");
         return NULL;
     }
-    return coroutine_switch(co, cur, arg);
+    return coroutine_switch(co, arg);
 }
 
 void coroutine_free(coroutine_t co)
 {
     if(!co)
     {
-        fprintf(stderr, "coroutine_free(): coroutine must not be null.\n");
+        fprintf(stderr, "coroutine_free(): coroutine 'co' must not be null.\n");
         return;
     }
     else if(co->state == STATE_STARTED)
     {
-        fprintf(stderr, "coroutine_free(): coroutine must be terminated or unstarted.\n");
+        fprintf(stderr, "coroutine_free(): coroutine 'co' must be terminated or unstarted.\n");
         return;
     }
     else
