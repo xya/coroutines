@@ -5,7 +5,6 @@
 struct coroutine
 {
     int state;              // unstarted, running, paused, finished
-    int refs;
     void *pc;               // the coroutine's program counter
     void *stack;            // the coroutine's stack (i.e. used with ESP register)
     coroutine_t caller;     // the coroutine which resumed this one
@@ -45,7 +44,6 @@ void coroutine_main(coroutine_func f, void *arg)
     // create a coroutine for the 'main' function
     coroutine_t co = (coroutine_t)malloc(sizeof(struct coroutine));
     co->state = STATE_RUNNING;
-    co->refs = 1;
     co->entry = f;
     co->pc = NULL;
     co->caller = NULL;
@@ -58,11 +56,7 @@ void coroutine_main(coroutine_func f, void *arg)
     
     // the coroutine finished
     co->state = STATE_FINISHED;
-    if(co->caller)
-    {
-        coroutine_free(co->caller);
-        co->caller = NULL;
-    }
+    co->caller = NULL;
     coroutine_free(co);
     current = NULL;
 }
@@ -89,7 +83,6 @@ coroutine_t coroutine_spawn(coroutine_func f)
         return NULL;
     }
     co->state = STATE_UNSTARTED;
-    co->refs = 1;
     co->entry = f;
     co->pc = NULL;
     co->caller = NULL;
@@ -153,21 +146,10 @@ void coroutine_free(coroutine_t co)
         fprintf(stderr, "coroutine_free(): coroutine must be terminated or unstarted.\n");
         return;
     }
-    else if(co->refs > 0)
+    else
     {
-        co->refs--;
-        printf("coroutine %p: %i refs remaining\n", co, co->refs);
-        if(co->refs == 0)
-        {
-            if(co->orig_stack)
-                free(co->orig_stack);
-            if(co->caller)
-            {
-                coroutine_free(co->caller);
-                co->caller = NULL;
-            }
-            printf("freeing coroutine %p\n", co);
-            free(co);
-        }
+        if(co->orig_stack)
+            free(co->orig_stack);
+        free(co);
     }
 }
