@@ -7,22 +7,23 @@ void pong(void *arg);
 
 int main(int argc, char **argv)
 {
-    coroutine_main(pong, NULL);
-}
-
-void pong(void *arg)
-{
-    uintptr_t n = 1;
-    coroutine_t co_ping = coroutine_spawn(ping);
-    do
-    {
-        printf("ping! %zi\n", n);
-        n = (uintptr_t)coroutine_resume(co_ping, (void *)(n + 1)); 
-    }
-    while(coroutine_alive(co_ping));
+    coroutine_main(ping, NULL);
 }
 
 void ping(void *arg)
+{
+    uintptr_t n = 1;
+    coroutine_t co_pong = coroutine_spawn(pong);
+    do
+    {
+        printf("ping! %zi\n", n);
+        n = (uintptr_t)coroutine_resume(co_pong, (void *)(n + 1)); 
+    }
+    while(coroutine_alive(co_pong));
+    coroutine_free(co_pong);
+}
+
+void pong(void *arg)
 {
     uintptr_t n = (uintptr_t)arg;
     while(n < 10)

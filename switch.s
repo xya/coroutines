@@ -10,6 +10,7 @@ coroutine_switch:
     movq %rsp, 16(%rsi)     # src->stack = current stack
     movq %rsi, 24(%rdi)     # dst->caller = src
     movl $2, (%rsi)         # src->state = PAUSED
+    incl 4(%rsi)            # src->refs++
     movq %rdi, current      # current = dst
     cmpl $0, (%rdi)         # has the coroutine been started before?
     je coroutine_enter
@@ -39,9 +40,10 @@ coroutine_exit:
     popq %rdi
     movq 16(%rsi), %rsp     # restore the callers stack
     popq %rbp
-    pushq %rsi
-    call coroutine_exited
-    popq %rsi
+    movl $3, (%rdi)         # dst->state = FINISHED
+    movq 24(%rdi), %rax     # dst->caller->refs--
+    decl 4(%rax)
+    movq $0, 24(%rdi)       # dst->caller = NULL
     movq $0, %rax
     jmp *8(%rsi)            # src->pc()
     

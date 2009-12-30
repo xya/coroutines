@@ -30,4 +30,7 @@ coroutine_t coroutine_current();
 // Return a non-zero value if the coroutine has not finished executing yet.
 int coroutine_alive(coroutine_t co);
 
+// Free the memory allocated for the coroutine.
+void coroutine_free(coroutine_t co);
+
 #endif
