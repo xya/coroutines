@@ -5,10 +5,10 @@
 struct coroutine
 {
     int state;              // unstarted, running, paused, finished
-    coroutine_func entry;
-    void *stack_ptr;        // the coroutine's stack (i.e. used with ESP register)
     void *pc;               // the coroutine's program counter
+    void *stack_ptr;        // the coroutine's stack (i.e. used with ESP register)
     coroutine_t caller;     // the coroutine which resumed this one
+    coroutine_func entry;
 };
 
 #define STATE_UNSTARTED     0
@@ -20,7 +20,7 @@ struct coroutine
 
 static coroutine_t current = NULL;
 
-extern void *coroutine_switch(coroutine_t co, void *arg);
+extern void *coroutine_switch(coroutine_t dst, coroutine_t src, void *arg);
 
 coroutine_t coroutine_current()
 {
@@ -83,29 +83,31 @@ coroutine_t coroutine_spawn(coroutine_func f)
 
 void *coroutine_yield(void *arg)
 {
-    coroutine_t co = coroutine_current();
-    if(!co)
+    coroutine_t cur = coroutine_current();
+    if(!cur)
     {
         fprintf(stderr, "coroutine_yield(): no coroutine is executing.\n");
         return NULL;
     }
-    else if(!co->caller)
+    coroutine_t caller = cur->caller;
+    if(!caller)
     {
         fprintf(stderr, "coroutine_yield(): current coroutine doesn't have a caller.\n");
         return NULL;
     }
-    else if(!coroutine_alive(co->caller))
+    else if(!coroutine_alive(caller))
     {
         fprintf(stderr, "coroutine_yield(): caller must be still alive.\n");
         return NULL;
     }
-    return coroutine_switch(co->caller, arg);
+    return coroutine_switch(caller, cur, arg);
 }
 
 void *coroutine_resume(coroutine_t co, void *arg)
 {
+    coroutine_t cur = coroutine_current();
     int state;
-    if(!coroutine_current())
+    if(!cur)
     {
         fprintf(stderr, "coroutine_resume(): no coroutine is executing.\n");
         return NULL;
@@ -120,5 +122,25 @@ void *coroutine_resume(coroutine_t co, void *arg)
         fprintf(stderr, "coroutine_resume(): callee coroutine must be still alive.\n");
         return NULL;
     }
-    return coroutine_switch(co, arg);
+    return coroutine_switch(co, cur, arg);
 }
+
+/*
+extern void *coroutine_switch(coroutine_t dst, coroutine_t src, void *arg)
+{
+    if(co == NULL)
+        goto error;
+    // save the current context (registers and arg)
+    
+    c = current
+    c->state = 2 (PAUSED)
+    
+    // switch to coroutine 'co' (i.e., call co->pc)
+    co->state = 1 (RUNNING)
+    current = co
+    co->pc
+    
+    // when rescheduled, restore the context and return the result
+
+}
+ */

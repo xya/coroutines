@@ -26,7 +26,7 @@ void ping(void *arg)
     uintptr_t n = (uintptr_t)arg;
     if(n <= 10)
     {
-        printf("ping! (%zi)\n", n);
+        printf("ping! %zi\n", n);
         n++;
         n = (uintptr_t)coroutine_yield((void *)n);
     }
