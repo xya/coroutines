@@ -41,7 +41,7 @@ void coroutine_main(coroutine_func f, void *arg)
     co->pc = NULL;
     co->caller = NULL;
     current = co;
-    co->stack_ptr = NULL; // TODO get stack pointer
+    co->stack_ptr = NULL;
     
     // execute it
     co->entry(arg);
@@ -77,7 +77,7 @@ coroutine_t coroutine_spawn(coroutine_func f)
     co->entry = f;
     co->pc = NULL;
     co->caller = NULL;
-    co->stack_ptr = stack;
+    co->stack_ptr = stack + COROUTINE_STACK_SIZE; // stack grows downwards
     return co;
 }
 
@@ -107,7 +107,6 @@ void *coroutine_yield(void *arg)
 void *coroutine_resume(coroutine_t co, void *arg)
 {
     coroutine_t cur = coroutine_current();
-    int state;
     if(!cur)
     {
         fprintf(stderr, "coroutine_resume(): no coroutine is executing.\n");
@@ -126,23 +125,3 @@ void *coroutine_resume(coroutine_t co, void *arg)
     printf("resume(%p, %p, %p)\n", co, cur, arg);
     return coroutine_switch(co, cur, arg);
 }
-
-/*
-extern void *coroutine_switch(coroutine_t dst, coroutine_t src, void *arg)
-{
-    if(co == NULL)
-        goto error;
-    // save the current context (registers and arg)
-    
-    c = current
-    c->state = 2 (PAUSED)
-    
-    // switch to coroutine 'co' (i.e., call co->pc)
-    co->state = 1 (RUNNING)
-    current = co
-    co->pc
-    
-    // when rescheduled, restore the context and return the result
-
-}
- */
