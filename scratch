@@ -72,30 +72,3 @@ void *coroutine_switch(coroutine *co, void *arg)
     save the current context (registers and arg)
     switch to coroutine 'co' (i.e., call co->pc)
     when rescheduled, restore the context and return the result
-
-int main(int argc, char **argv)
-{
-    coroutine_main(pong, NULL);
-}
-
-void pong(void *arg)
-{
-    uintptr_t n = 1;
-    coroutine *co_ping = coroutine_spawn(ping, (void *)n, (void **)&n);
-    while(coroutine_alive(co_ping))
-    {
-        printf("pong! %i\n", n);
-        n = (uintptr_t)coroutine_resume(co_ping, (void *)n);
-    }
-}
-
-void ping(void *arg)
-{
-    uintptr_t n = (uintptr_t)arg;
-    if(n <= 10)
-    {
-        printf("ping! (%i)\n", n);
-        n++;
-        n = (uintptr_t)coroutine_yield((void *)n);
-    }
-}
