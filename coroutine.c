@@ -18,7 +18,7 @@ struct coroutine
 
 #define COROUTINE_STACK_SIZE    4096
 
-static coroutine_t current = NULL;
+coroutine_t current = NULL;
 
 extern void *coroutine_switch(coroutine_t dst, coroutine_t src, void *arg);
 
@@ -100,6 +100,7 @@ void *coroutine_yield(void *arg)
         fprintf(stderr, "coroutine_yield(): caller must be still alive.\n");
         return NULL;
     }
+    printf("yield(%p, %p, %p)\n", caller, cur, arg);
     return coroutine_switch(caller, cur, arg);
 }
 
@@ -122,6 +123,7 @@ void *coroutine_resume(coroutine_t co, void *arg)
         fprintf(stderr, "coroutine_resume(): callee coroutine must be still alive.\n");
         return NULL;
     }
+    printf("resume(%p, %p, %p)\n", co, cur, arg);
     return coroutine_switch(co, cur, arg);
 }
 

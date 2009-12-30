@@ -5,6 +5,8 @@ typedef struct coroutine *coroutine_t;
 
 typedef void (*coroutine_func)(void *arg);
 
+extern coroutine_t current;
+
 // Execute a function as the main coroutine
 void coroutine_main(coroutine_func f, void *arg);
 
