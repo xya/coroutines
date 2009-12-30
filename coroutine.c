@@ -13,9 +13,8 @@ struct coroutine
 };
 
 #define STATE_UNSTARTED     0
-#define STATE_RUNNING       1
-#define STATE_PAUSED        2
-#define STATE_FINISHED      3
+#define STATE_STARTED       1
+#define STATE_FINISHED      2
 
 #define COROUTINE_STACK_SIZE    4096
 
@@ -43,7 +42,7 @@ void coroutine_main(coroutine_func f, void *arg)
     
     // create a coroutine for the 'main' function
     coroutine_t co = (coroutine_t)malloc(sizeof(struct coroutine));
-    co->state = STATE_RUNNING;
+    co->state = STATE_STARTED;
     co->entry = f;
     co->pc = NULL;
     co->caller = NULL;
@@ -61,7 +60,7 @@ void coroutine_main(coroutine_func f, void *arg)
     current = NULL;
 }
 
-coroutine_t coroutine_spawn(coroutine_func f)
+coroutine_t coroutine_create(coroutine_func f)
 {
     // create a coroutine for the function
     coroutine_t co;
@@ -69,7 +68,7 @@ coroutine_t coroutine_spawn(coroutine_func f)
     
     if(!coroutine_current())
     {
-        fprintf(stderr, "coroutine_spawn(): no coroutine is executing.\n");
+        fprintf(stderr, "coroutine_create(): no coroutine is executing.\n");
         return NULL;
     }
     
@@ -141,7 +140,7 @@ void coroutine_free(coroutine_t co)
         fprintf(stderr, "coroutine_free(): coroutine must not be null.\n");
         return;
     }
-    else if((co->state == STATE_RUNNING) || (co->state == STATE_PAUSED))
+    else if(co->state == STATE_STARTED)
     {
         fprintf(stderr, "coroutine_free(): coroutine must be terminated or unstarted.\n");
         return;

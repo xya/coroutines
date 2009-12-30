@@ -13,7 +13,7 @@ int main(int argc, char **argv)
 void ping(void *arg)
 {
     uintptr_t n = 1;
-    coroutine_t co_pong = coroutine_spawn(pong);
+    coroutine_t co_pong = coroutine_create(pong);
     do
     {
         printf("ping! %zi\n", n);
