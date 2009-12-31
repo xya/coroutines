@@ -16,7 +16,7 @@ struct coroutine
 #define STATE_STARTED       1
 #define STATE_FINISHED      2
 
-#define COROUTINE_STACK_SIZE    4096
+#define COROUTINE_STACK_SIZE    4096*8
 
 coroutine_t current = NULL;
 
