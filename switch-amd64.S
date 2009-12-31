@@ -3,6 +3,7 @@
 // references in coroutine.c
 .globl current
 .globl coroutine_set_caller
+.globl coroutine_terminated
 
 // void *coroutine_switch(coroutine_t co, void *arg);
 coroutine_switch:   .globl coroutine_switch
@@ -45,9 +46,9 @@ coroutine_exit:
     movq 24(%rdi), %rsi     # get the last caller
     movq 16(%rsi), %rsp     # restore its stack
     popq %rbp
-    movl $2, (%rdi)         # co->state = FINISHED
-    movq $0, 24(%rdi)       # co->caller = NULL
-    movq %rsi, current      # current = caller
+    pushq %rsi
+    call coroutine_terminated
+    popq %rsi
     movq $0, %rax
     jmp *8(%rsi)            # caller->pc()
 

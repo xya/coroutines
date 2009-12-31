@@ -2,10 +2,10 @@
 #include <stdio.h>
 #include "coroutine.h"
 
-struct call_entry
+struct coroutine_ref
 {
-    coroutine_t callee;
-    call_entry_t next;
+    coroutine_t co;
+    coroutine_ref_t next;
 };
 
 struct coroutine
@@ -16,7 +16,7 @@ struct coroutine
     coroutine_t caller;     // the coroutine which resumed this one
     coroutine_func entry;
     void *orig_stack;
-    struct call_entry refs; // linked list of coroutines whose caller is this coroutine
+    struct coroutine_ref refs; // list of coroutines linked to this one
 };
 
 #define STATE_UNSTARTED     0
@@ -28,10 +28,11 @@ struct coroutine
 coroutine_t current = NULL;
 
 extern void *coroutine_switch(coroutine_t co, void *arg);
-void coroutine_add_callee(coroutine_t co, coroutine_t callee, call_entry_t tail);
-void coroutine_remove_callee(coroutine_t co, coroutine_t callee);
-int coroutine_find_callee(coroutine_t co, coroutine_t callee, call_entry_t *tail);
+void coroutine_add_ref(coroutine_t co, coroutine_t ref, coroutine_ref_t tail);
+void coroutine_remove_ref(coroutine_t co, coroutine_t ref);
+int coroutine_find_ref(coroutine_t co, coroutine_t ref, coroutine_ref_t *tail);
 void coroutine_set_caller(coroutine_t co, coroutine_t caller);
+void coroutine_terminated(coroutine_t co);
 
 coroutine_t coroutine_current()
 {
@@ -59,7 +60,7 @@ void coroutine_main(coroutine_func f, void *arg)
     co->caller = NULL;
     co->stack = NULL;
     co->orig_stack = NULL;
-    co->refs.callee = NULL;
+    co->refs.co = NULL;
     co->refs.next = NULL;
     current = co;
     
@@ -102,7 +103,7 @@ coroutine_t coroutine_create(coroutine_func f, size_t stacksize)
     co->caller = NULL;
     co->stack = stack + stacksize; // stack grows downwards
     co->orig_stack = stack;
-    co->refs.callee = NULL;
+    co->refs.co = NULL;
     co->refs.next = NULL;
     return co;
 }
@@ -149,16 +150,16 @@ void *coroutine_resume(coroutine_t co, void *arg)
     return coroutine_switch(co, arg);
 }
 
-void coroutine_add_callee(coroutine_t co, coroutine_t callee, call_entry_t tail)
+void coroutine_add_ref(coroutine_t co, coroutine_t ref, coroutine_ref_t tail)
 {
-    // is the callee list empty?
-    if(co->refs.callee == NULL)
+    // is the reference list empty?
+    if(co->refs.co == NULL)
     {
-        co->refs.callee = callee;
+        co->refs.co = co;
         return;
     }
     
-    // find the tail of the callee list
+    // find the tail of the reference list
     if(!tail)
     {
         tail = &co->refs;
@@ -166,42 +167,42 @@ void coroutine_add_callee(coroutine_t co, coroutine_t callee, call_entry_t tail)
             tail = tail->next;
     }
     
-    // add the callee at the end of the list
-    tail->next = (call_entry_t)malloc(sizeof(struct call_entry));
-    tail->next->callee = callee;
+    // add the coroutine at the end of the list
+    tail->next = (coroutine_ref_t)malloc(sizeof(struct coroutine_ref));
+    tail->next->co = co;
     tail->next->next = NULL;
 }
 
-void coroutine_remove_callee(coroutine_t co, coroutine_t callee)
+void coroutine_remove_ref(coroutine_t co, coroutine_t ref)
 {
-    call_entry_t ref = NULL, next = NULL;
-    if(coroutine_find_callee(co, callee, &ref))
+    coroutine_ref_t entry = NULL, next = NULL;
+    if(coroutine_find_ref(co, ref, &entry))
     {
-        next = ref->next;
+        next = entry->next;
         if(next)
         {
-            ref->callee = next->callee;
-            ref->next = next->next;
+            entry->co = next->co;
+            entry->next = next->next;
             free(next);
         }
         else
         {
-            ref->callee = NULL;
+            entry->co = NULL;
         }
     }
 }
 
-// find a callee in a coroutine's call list
-int coroutine_find_callee(coroutine_t co, coroutine_t callee, call_entry_t *tail)
+// find a reference in a coroutine's ref list
+int coroutine_find_ref(coroutine_t co, coroutine_t ref, coroutine_ref_t *tail)
 {
-    call_entry_t last = &co->refs;
-    if(last->callee == NULL)
+    coroutine_ref_t last = &co->refs;
+    if(last->co == NULL)
     {
         if(tail)
             *tail = NULL;
         return 0;
     }
-    else if(last->callee = callee)
+    else if(last->co = ref)
     {
         if(tail)
             *tail = last;
@@ -211,7 +212,7 @@ int coroutine_find_callee(coroutine_t co, coroutine_t callee, call_entry_t *tail
     {
         while(last->next)
         {
-            if(last->callee == callee)
+            if(last->co == ref)
             {
                 if(tail)
                     *tail = last;
@@ -227,14 +228,24 @@ int coroutine_find_callee(coroutine_t co, coroutine_t callee, call_entry_t *tail
 
 void coroutine_set_caller(coroutine_t co, coroutine_t caller)
 {
-    call_entry_t tail = NULL;
+    coroutine_ref_t tail = NULL;
     
-    printf("coroutine %p holds a reference to coroutine %p\n", co, caller);
+    //printf(" %p <=> %p\n", co, caller);
     
     co->caller = caller;
-    // keep track of which coroutines have another coroutine as caller
-    if(!coroutine_find_callee(caller, co, &tail))
-        coroutine_add_callee(caller, co, tail);
+    if(!coroutine_find_ref(co, caller, &tail))
+        coroutine_add_ref(co, caller, tail);
+    if(!coroutine_find_ref(caller, co, &tail))
+        coroutine_add_ref(caller, co, tail);
+}
+
+void coroutine_terminated(coroutine_t co)
+{
+    co->state = STATE_FINISHED;
+    current = co->caller;
+    co->caller = NULL;
+    
+    // find all coroutines which have a reference to this coroutine
 }
 
 void coroutine_free(coroutine_t co)
@@ -251,8 +262,10 @@ void coroutine_free(coroutine_t co)
     }
     printf("freeing coroutine %p\n", co);
     
+    coroutine_ref_t tail = &co->refs;
+    
+    /*
     // we need to remove references to this coroutine for every callee
-    call_entry_t tail = &co->refs;
     if(tail->callee != NULL)
     {
         while(tail)
@@ -263,9 +276,10 @@ void coroutine_free(coroutine_t co)
             tail = tail->next;
         }
     }
+    */
     
-    // free the callee list
-    call_entry_t current = co->refs.next;
+    // free the caller list
+    coroutine_ref_t current = co->refs.next;
     while(current)
     {
         tail = current->next;
@@ -273,6 +287,7 @@ void coroutine_free(coroutine_t co)
         current = tail;
     }
     
+    /*
     // maybe this coroutine has a reference to a callee, too
     if(co->caller)
     {
@@ -280,6 +295,7 @@ void coroutine_free(coroutine_t co)
         coroutine_remove_callee(co->caller, co);
         co->caller = NULL;
     }
+    */
 
     if(co->orig_stack)
         free(co->orig_stack);
