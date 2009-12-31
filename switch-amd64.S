@@ -2,7 +2,6 @@
 
 // references in coroutine.c
 .globl current
-.globl coroutine_set_caller
 .globl coroutine_terminated
 
 // void *coroutine_switch(coroutine_t co, void *arg);
@@ -15,11 +14,7 @@ coroutine_switch:   .globl coroutine_switch
     popq 8(%rsi)            # current->pc = return address of the caller
     pushq %rbp
     movq %rsp, 16(%rsi)     # current->stack = current stack
-    pushq %rdi
-    pushq %rdx
-    call coroutine_set_caller
-    popq %rdx
-    popq %rdi
+    movq %rsi, 24(%rdi)     # co->caller = current
     movq %rdi, current      # current = co
     cmpl $0, (%rdi)         # has the coroutine not been started before?
     je coroutine_enter
