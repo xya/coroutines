@@ -1,10 +1,11 @@
 .section .text
 
+// references in coroutine.c
 .globl current
-.globl coroutine_switch
+.globl coroutine_set_caller
 
 // void *coroutine_switch(coroutine_t co, void *arg);
-coroutine_switch:
+coroutine_switch:   .globl coroutine_switch
 // save the current context (stack, return address and registers)
     cmpl $2, (%rdi)         # is the coroutine finished?
     je coroutine_error
@@ -13,7 +14,11 @@ coroutine_switch:
     popq 8(%rsi)            # current->pc = return address of the caller
     pushq %rbp
     movq %rsp, 16(%rsi)     # current->stack = current stack
-    movq %rsi, 24(%rdi)     # co->caller = current
+    pushq %rdi
+    pushq %rdx
+    call coroutine_set_caller
+    popq %rdx
+    popq %rdi
     movq %rdi, current      # current = co
     cmpl $0, (%rdi)         # has the coroutine not been started before?
     je coroutine_enter

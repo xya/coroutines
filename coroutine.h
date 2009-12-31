@@ -2,6 +2,7 @@
 #define COROUTINE_H
 
 typedef struct coroutine *coroutine_t;
+typedef struct call_entry *call_entry_t;
 
 typedef void (*coroutine_func)(void *arg);
 
