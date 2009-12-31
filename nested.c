@@ -14,8 +14,8 @@ int main(int argc, char **argv)
 void foo(void *arg)
 {
     printf("entering foo\n");
-    coroutine_t co_bar = coroutine_create(bar);
-    coroutine_t co_baz = coroutine_create(baz);
+    coroutine_t co_bar = coroutine_create(bar, 0);
+    coroutine_t co_baz = coroutine_create(baz, 0);
     coroutine_resume(co_bar, NULL);
     coroutine_resume(co_baz, co_bar);
     printf("leaving foo\n");

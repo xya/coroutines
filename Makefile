@@ -11,7 +11,7 @@ test_poll: test_poll.o coroutine.o switch.o
 coroutine.o: coroutine.c coroutine.h
 	gcc -c -ggdb -std=c99 -o coroutine.o coroutine.c
 switch.o: switch-amd64.S
-	as -ggdb -std=c99 -o switch.o switch-amd64.S
+	as -ggdb -o switch.o switch-amd64.S
 pingpong.o: pingpong.c coroutine.h
 	gcc -c -ggdb -std=c99 -o pingpong.o pingpong.c
 nested.o: nested.c coroutine.h

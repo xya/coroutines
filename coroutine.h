@@ -11,7 +11,7 @@ extern coroutine_t current;
 void coroutine_main(coroutine_func f, void *arg);
 
 // Create a new coroutine, but don't start executing it
-coroutine_t coroutine_create(coroutine_func f);
+coroutine_t coroutine_create(coroutine_func f, size_t stacksize);
 
 // Pause the execution of the current coroutine, passing 'arg' to the caller
 // coroutine (the one which called coroutine_resume()) and returning the value

@@ -16,7 +16,7 @@ struct coroutine
 #define STATE_STARTED       1
 #define STATE_FINISHED      2
 
-#define COROUTINE_STACK_SIZE    4096*8
+#define COROUTINE_STACK_SIZE    4096
 
 coroutine_t current = NULL;
 
@@ -60,7 +60,7 @@ void coroutine_main(coroutine_func f, void *arg)
     current = NULL;
 }
 
-coroutine_t coroutine_create(coroutine_func f)
+coroutine_t coroutine_create(coroutine_func f, size_t stacksize)
 {
     // create a coroutine for the function
     coroutine_t co;
@@ -75,7 +75,9 @@ coroutine_t coroutine_create(coroutine_func f)
     co = (coroutine_t)malloc(sizeof(struct coroutine));
     if(!co)
         return NULL;
-    stack = malloc(COROUTINE_STACK_SIZE);
+    if(stacksize < COROUTINE_STACK_SIZE)
+        stacksize = COROUTINE_STACK_SIZE;
+    stack = malloc(stacksize);
     if(!stack)
     {
         free(co);
@@ -85,7 +87,7 @@ coroutine_t coroutine_create(coroutine_func f)
     co->entry = f;
     co->pc = NULL;
     co->caller = NULL;
-    co->stack = stack + COROUTINE_STACK_SIZE; // stack grows downwards
+    co->stack = stack + stacksize; // stack grows downwards
     co->orig_stack = stack;
     return co;
 }

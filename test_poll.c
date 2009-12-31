@@ -62,8 +62,7 @@ typedef struct
 } BlockHeader;
 
 void send_receive(void *arg);
-void start_op(SendReceiveOptions *opts, io_op *op);
-void stop_op(SendReceiveOptions *opts, io_op *op);
+void fill_fd_sets(SendReceiveOptions *opts, io_op **ops, int opcount);
 int op_ready(SendReceiveOptions *opts, io_op *op);
 int blocking_mode(int fd, int blocking);
 ssize_t coroutine_read(int fd, void *buffer, size_t size);
@@ -108,58 +107,50 @@ int main(int argc, char **argv)
 void send_receive(void *arg)
 {
     SendReceiveOptions *opts = (SendReceiveOptions *)arg;
-    coroutine_t sender = coroutine_create(send_file);
-    coroutine_t receiver = coroutine_create(receive_file);
+    coroutine_t sender = coroutine_create(send_file, 4096 * 2);
+    coroutine_t receiver = coroutine_create(receive_file, 4096 * 2);
     io_op *op[2] = {NULL, NULL};
     
     op[0] = coroutine_resume(sender, opts);
-    //start_op(opts, op[0]);
     op[1] = coroutine_resume(receiver, opts);
-    //start_op(opts, op[1]);
     while(op[0] || op[1])
     {
-        /*
+        fill_fd_sets(opts, op, 2);
         if(select(opts->max_fd, &opts->read_fds, &opts->write_fds, NULL, NULL) == -1)
         {
             perror("select()");
             break;
         }
-       */
         for(int i = 0; i < 2; i++)
         {
-            //if(op_ready(opts, op[i]))
-            if(op[i])
-            {
-                //stop_op(opts, op[i]);
+            if(op_ready(opts, op[i]))
                 op[i] = coroutine_resume(op[i]->co, NULL);
-                //start_op(opts, op[i]);
-            }
         }
     }
     coroutine_free(sender);
     coroutine_free(receiver);
 }
 
-void start_op(SendReceiveOptions *opts, io_op *op)
+void fill_fd_sets(SendReceiveOptions *opts, io_op **ops, int opcount)
 {
-    if(!op)
-        return;
-    else if(op->is_read)
-        FD_SET(op->fd, &opts->read_fds);
-    else
-        FD_SET(op->fd, &opts->write_fds);
-    if(opts->max_fd < (op->fd + 1))
-        opts->max_fd = op->fd + 1;
-}
-
-void stop_op(SendReceiveOptions *opts, io_op *op)
-{
-    if(!op)
-        return;
-    else if(op->is_read)
-        FD_CLR(op->fd, &opts->read_fds);
-    else
-        FD_CLR(op->fd, &opts->write_fds);
+    io_op *op;
+    int max_fd = 0;
+    
+    FD_ZERO(&opts->read_fds);
+    FD_ZERO(&opts->write_fds);
+    for(int i = 0; i < opcount; i++)
+    {
+        op = ops[i];
+        if(op)
+        {
+            if(op->is_read)
+                FD_SET(op->fd, &opts->read_fds);
+            else
+                FD_SET(op->fd, &opts->write_fds);
+            if(opts->max_fd < (op->fd + 1))
+                opts->max_fd = op->fd + 1;
+        }
+    }
 }
 
 int op_ready(SendReceiveOptions *opts, io_op *op)
