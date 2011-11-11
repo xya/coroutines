@@ -41,9 +41,9 @@ coroutine_exit:
     movq 24(%rdi), %rsi     # get the last caller
     movq 16(%rsi), %rsp     # restore its stack
     popq %rbp
-    pushq %rsi
+    pushq %rsi              # XXX is that needed?
     call coroutine_terminated
-    popq %rsi
+    popq %rsi               # XXX is that needed?
     movq $0, %rax
     jmp *8(%rsi)            # caller->pc()
 
