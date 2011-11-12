@@ -7,12 +7,12 @@
 // rdi: co, rsi: arg, rax: current, rdx: state
 coroutine_switch:   .globl coroutine_switch
 // save the current context (stack, return address and registers)
-    movq current, %rax
-    popq 8(%rax)            # current->ret_addr = caller
-    pushq %rbp
-    movq %rsp, 16(%rax)     # current->stack = current stack
-    movq %rax, 24(%rdi)     # co->caller = current
+    movq current, %rax      # current->ret_addr = caller
+    popq 8(%rax)
     movq %rdi, current      # current = co
+    movq %rax, 24(%rdi)     # co->caller = current
+    pushq %rbp              # current->stack = current stack
+    movq %rsp, 16(%rax)
     movl (%rdi), %edx       # call coroutine_entry if co hasn't started yet
     and $0x10000000, %edx
     cmpl $0, %edx

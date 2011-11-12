@@ -2,47 +2,49 @@
 
 // references in coroutine.c
 .globl current
-.globl coroutine_terminated
 
 // void *coroutine_switch(coroutine_t co, void *arg);
+// ecx: co, eax: arg, edx: current/state
 coroutine_switch:   .globl coroutine_switch
 // save the current context (stack, return address and registers)
-    movl 4(%esp), %ecx      # ecx = co
-    movl 8(%esp), %eax      # <return value> = arg
-    movl current, %edx      # edx = current
-    pop 4(%edx)             # current->pc = return address of the caller
-    push %ebp
-    movl %esp, 8(%edx)      # current->stack = current stack
+    movl current, %edx      # current->ret_addr = caller
+    pop 4(%edx)
+    movl (%esp), %ecx       # current = co
+    movl %ecx, current
     movl %edx, 12(%ecx)     # co->caller = current
-    movl %ecx, current      # current = co
-    cmpl $0, (%ecx)         # has the coroutine not been started before?
-    je coroutine_enter
+    movl 4(%esp), %eax      # load arg
+    push %ebp               # current->stack = current stack
+    movl %esp, 8(%edx)
+    movl (%ecx), %edx       # call coroutine_entry if co hasn't started yet
+    and $0x10000000, %edx
+    cmpl $0, %edx
+    je coroutine_entry
 
-// when rescheduled, restore the context and return the result 
-coroutine_do_resume:
+// void *coroutine_return(coroutine_t co, void *arg)
+// ecx: co, eax: arg
+coroutine_return:
     movl 8(%ecx), %esp      # restore the coroutine`s stack
-    pop %ebp                # restore rbp
-    jmp *4(%ecx)            # co->pc()
+    popl %ebp               # restore rbp
+    push 4(%ecx)            # return to co's caller
+    ret
 
+// void coroutine_entry(coroutine_t co, void *arg) no_return
 // run the dest coroutine (for the first time)
-coroutine_enter:
+coroutine_entry:
+// ecx: co, eax: arg
     orl $0x10000000, (%ecx) # co->state |= STARTED
     movl 8(%ecx), %esp      # switch to coroutine`s stack
-    push %ecx
+    push %ecx               # save co
     push %eax
     call *16(%ecx)          # co->entry(arg)
 
 // the coroutine exited, switch back to its last caller
-coroutine_exit:
-    pop %eax                
-    pop %ecx
-    movl 12(%ecx), %edx     # get the last caller
-    movl 8(%edx), %esp      # restore its stack
-    pop %ebp
-    push %edx
-    push %ecx
-    call coroutine_terminated
-    pop %ecx
-    pop %edx
-    movl $0, %eax
-    jmp *4(%edx)            # caller->pc()
+// ecx: caller, eax: co
+    add $4, %esp
+    pop %eax                # restore co
+    orl $0x80000000, (%eax) # co->state |= FINISHED
+    movl 12(%eax), %ecx     # current = co->caller
+    movl %ecx, current
+    movl $0, 12(%eax)       # co->caller = NULL
+    movl $0, %eax           # coroutine_return(current, 0)
+    jmp coroutine_return

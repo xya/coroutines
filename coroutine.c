@@ -22,7 +22,6 @@ struct coroutine
 coroutine_t current = NULL;
 
 extern void *coroutine_switch(coroutine_t co, void *arg);
-void coroutine_terminated(coroutine_t co);
 
 coroutine_t coroutine_current()
 {
@@ -65,7 +64,8 @@ void coroutine_main(coroutine_func f, void *arg)
     
     // execute it
     co->entry(arg);
-    coroutine_terminated(co);
+    co->state |= COROUTINE_FINISHED;
+    current = co->caller = NULL;
     coroutine_free(co);
 }
 
@@ -141,13 +141,6 @@ void *coroutine_resume(coroutine_t co, void *arg)
         return NULL;
     }
     return coroutine_switch(co, arg);
-}
-
-void coroutine_terminated(coroutine_t co)
-{
-    co->state |= COROUTINE_FINISHED;
-    current = co->caller;
-    co->caller = NULL;
 }
 
 void coroutine_free(coroutine_t co)
