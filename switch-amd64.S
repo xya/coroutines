@@ -2,7 +2,6 @@
 
 // references in coroutine.c
 .globl current
-.globl coroutine_terminated
 
 // void *coroutine_switch(coroutine_t co, void *arg);
 // rdi: co, rsi: arg, rax: current, rdx: state
@@ -14,36 +13,37 @@ coroutine_switch:   .globl coroutine_switch
     movq %rsp, 16(%rax)     # current->stack = current stack
     movq %rax, 24(%rdi)     # co->caller = current
     movq %rdi, current      # current = co
-    movl (%rdi), %edx       # has the coroutine not been started before?
+    movl (%rdi), %edx       # call coroutine_entry if co hasn't started yet
     and $0x10000000, %edx
     cmpl $0, %edx
     je coroutine_entry
 
-// when rescheduled, restore the context and return the result 
-coroutine_do_resume:
+// void *coroutine_return(coroutine_t co, void *arg)
+// rdi: co, rsi: arg
+coroutine_return:
     movq 16(%rdi), %rsp     # restore the coroutine`s stack
     popq %rbp               # restore rbp
     movq %rsi, %rax         # <return value> = arg
     push 8(%rdi)            # return to co's caller
     ret
 
+// void coroutine_entry(coroutine_t co, void *arg) no_return
 // run the dest coroutine (for the first time)
 coroutine_entry:
+// rdi: co, rsi: arg
     orl $0x10000000, (%rdi) # co->state |= STARTED
     movq 16(%rdi), %rsp     # switch to coroutine`s stack
-    pushq %rdi
+    pushq %rdi              # save co
     movq %rdi, %rdx         # co->entry(arg)
     movq %rsi, %rdi
     call *32(%rdx)
 
 // the coroutine exited, switch back to its last caller
-    popq %rdi
-    movq 24(%rdi), %rsi     # get the last caller
-    movq 16(%rsi), %rsp     # restore its stack
-    popq %rbp
-    pushq %rsi
-    call coroutine_terminated
-    popq %rsi
-    movq $0, %rax           # <return value> = 0
-    push 8(%rsi)            # return to the last caller
-    ret
+// rdi: caller, rsi: co
+    popq %rsi               # restore co
+    orl $0x80000000, (%rsi) # co->state |= FINISHED
+    movq 24(%rsi), %rdi     # current = co->caller
+    movq %rdi, current
+    movq $0, 24(%rsi)       # co->caller = NULL
+    movq $0, %rsi           # coroutine_return(current, 0)
+    jmp coroutine_return
