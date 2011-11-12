@@ -1,6 +1,6 @@
 LIB_OBJECTS = coroutine.o switch.o
-OBJECTS = pingpong.o nested.o test_poll.o convolution.o
-TARGETS = pingpong nested test_poll convolution
+OBJECTS = pingpong.o nested.o test_poll.o barrier.o convolution.o
+TARGETS = pingpong nested test_poll barrier convolution
 
 AS_FLAGS = -ggdb --32 
 CFLAGS = -ggdb -m32 -std=c99 
@@ -11,6 +11,8 @@ pingpong: pingpong.o $(LIB_OBJECTS)
 nested: nested.o $(LIB_OBJECTS)
 	gcc $(CFLAGS) -o $@ $< $(LIB_OBJECTS)
 test_poll: test_poll.o $(LIB_OBJECTS)
+	gcc $(CFLAGS) -o $@ $< $(LIB_OBJECTS)
+barrier: barrier.o $(LIB_OBJECTS)
 	gcc $(CFLAGS) -o $@ $< $(LIB_OBJECTS)
 convolution: convolution.o $(LIB_OBJECTS)
 	gcc $(CFLAGS) -o $@ $< $(LIB_OBJECTS)
