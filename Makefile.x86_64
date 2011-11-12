@@ -1,27 +1,22 @@
-OBJECTS = pingpong.o nested.o test_poll.o convolution.o coroutine.o switch.o
+LIB_OBJECTS = coroutine.o switch.o
+OBJECTS = pingpong.o nested.o test_poll.o convolution.o
+TARGETS = pingpong nested test_poll convolution
 
-all: pingpong nested test_poll convolution
-	
-pingpong: pingpong.o coroutine.o switch.o
-	gcc -o pingpong pingpong.o coroutine.o switch.o
-nested: nested.o coroutine.o switch.o
-	gcc -o nested nested.o coroutine.o switch.o
-test_poll: test_poll.o coroutine.o switch.o
-	gcc -o test_poll test_poll.o coroutine.o switch.o
-convolution: convolution.o coroutine.o switch.o
-	gcc -o convolution convolution.o coroutine.o switch.o
-coroutine.o: coroutine.c coroutine.h
-	gcc -c -ggdb -std=c99 -o coroutine.o coroutine.c
+AS_FLAGS = -ggdb --64 
+CFLAGS = -ggdb -m64 -std=c99 
+
+all: $(TARGETS)
+pingpong: pingpong.o $(LIB_OBJECTS)
+	gcc $(CFLAGS) -o $@ $< $(LIB_OBJECTS)
+nested: nested.o $(LIB_OBJECTS)
+	gcc $(CFLAGS) -o $@ $< $(LIB_OBJECTS)
+test_poll: test_poll.o $(LIB_OBJECTS)
+	gcc $(CFLAGS) -o $@ $< $(LIB_OBJECTS)
+convolution: convolution.o $(LIB_OBJECTS)
+	gcc $(CFLAGS) -o $@ $< $(LIB_OBJECTS)
 switch.o: switch-amd64.S
-	as -ggdb -o switch.o switch-amd64.S
-pingpong.o: pingpong.c coroutine.h
-	gcc -c -ggdb -std=c99 -o pingpong.o pingpong.c
-nested.o: nested.c coroutine.h
-	gcc -c -ggdb -std=c99 -o nested.o nested.c
-test_poll.o: test_poll.c coroutine.h
-	gcc -c -ggdb -std=c99 -o test_poll.o test_poll.c
-convolution.o: convolution.c convolution.h coroutine.h
-	gcc -c -ggdb -std=c99 -o convolution.o convolution.c
-	
+	as $(AS_FLAGS) -o $@ $<
+%.o: %.c
+	gcc -c $(CFLAGS) -o $@ $<
 clean:
-	rm -f pingpong nested test_poll convolution $(OBJECTS)
+	rm -f $(TARGETS) $(OBJECTS) $(LIB_OBJECTS)

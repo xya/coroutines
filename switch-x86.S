@@ -8,8 +8,6 @@
 coroutine_switch:   .globl coroutine_switch
 // save the current context (stack, return address and registers)
     movl 4(%esp), %ecx      # ecx = co
-    cmpl $2, (%ecx)         # is the coroutine finished?
-    je coroutine_error
     movl 8(%esp), %eax      # <return value> = arg
     movl current, %edx      # edx = current
     pop 4(%edx)             # current->pc = return address of the caller
@@ -28,7 +26,7 @@ coroutine_do_resume:
 
 // run the dest coroutine (for the first time)
 coroutine_enter:
-    movl $1, (%ecx)         # co->state = STARTED
+    orl $0x10000000, (%ecx) # co->state |= STARTED
     movl 8(%ecx), %esp      # switch to coroutine`s stack
     push %ecx
     push %eax
@@ -41,12 +39,10 @@ coroutine_exit:
     movl 12(%ecx), %edx     # get the last caller
     movl 8(%edx), %esp      # restore its stack
     pop %ebp
+    push %edx
     push %ecx
     call coroutine_terminated
     pop %ecx
+    pop %edx
     movl $0, %eax
     jmp *4(%edx)            # caller->pc()
-
-coroutine_error:
-    movl $0, %eax
-    ret
