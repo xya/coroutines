@@ -30,6 +30,10 @@ coroutine_t coroutine_current();
 // Return a non-zero value if the coroutine has not finished executing yet.
 int coroutine_alive(coroutine_t co);
 
+// Manipulate the user-defined state of the coroutine
+int coroutine_get_user_state(coroutine_t co);
+void coroutine_set_user_state(coroutine_t co, int state);
+
 // Free the memory allocated for the coroutine.
 void coroutine_free(coroutine_t co);
 

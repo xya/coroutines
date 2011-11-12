@@ -1,20 +1,21 @@
 #include <malloc.h>
 #include <stdio.h>
+#include <inttypes.h>
 #include "coroutine.h"
 
 struct coroutine
 {
-    int state;              // unstarted, running, paused, finished
-    void *pc;               // the coroutine's program counter
+    int state;              // XXX uint32
+    void *ret_addr;         // return address of coroutine_switch's caller
     void *stack;            // the coroutine's stack (i.e. used with ESP register)
     coroutine_t caller;     // the coroutine which resumed this one
     coroutine_func entry;
     void *orig_stack;
 };
 
-#define STATE_UNSTARTED     0
-#define STATE_STARTED       1
-#define STATE_FINISHED      2
+#define COROUTINE_STARTED       0x10000000
+#define COROUTINE_FINISHED      0x80000000
+#define COROUTINE_USER          0x0fffffff
 
 #define COROUTINE_STACK_SIZE    4096
 
@@ -30,7 +31,18 @@ coroutine_t coroutine_current()
 
 int coroutine_alive(coroutine_t co)
 {
-    return co && (co->state < STATE_FINISHED);
+    return co && ((co->state & COROUTINE_FINISHED) == 0);
+}
+
+int coroutine_get_user_state(coroutine_t co)
+{
+    return co ? co->state & COROUTINE_USER : 0;
+}
+
+void coroutine_set_user_state(coroutine_t co, int state)
+{
+    if(co)
+        co->state |= (state & COROUTINE_USER);
 }
 
 void coroutine_main(coroutine_func f, void *arg)
@@ -43,9 +55,9 @@ void coroutine_main(coroutine_func f, void *arg)
     
     // create a coroutine for the 'main' function
     coroutine_t co = (coroutine_t)malloc(sizeof(struct coroutine));
-    co->state = STATE_STARTED;
+    co->state = COROUTINE_STARTED;
     co->entry = f;
-    co->pc = NULL;
+    co->ret_addr = NULL;
     co->caller = NULL;
     co->stack = NULL;
     co->orig_stack = NULL;
@@ -80,9 +92,9 @@ coroutine_t coroutine_create(coroutine_func f, size_t stacksize)
         free(co);
         return NULL;
     }
-    co->state = STATE_UNSTARTED;
+    co->state = 0;
     co->entry = f;
-    co->pc = NULL;
+    co->ret_addr = NULL;
     co->caller = NULL;
     co->stack = stack + stacksize; // stack grows downwards
     co->orig_stack = stack;
@@ -133,7 +145,7 @@ void *coroutine_resume(coroutine_t co, void *arg)
 
 void coroutine_terminated(coroutine_t co)
 {
-    co->state = STATE_FINISHED;
+    co->state |= COROUTINE_FINISHED;
     current = co->caller;
     co->caller = NULL;
 }
@@ -141,11 +153,8 @@ void coroutine_terminated(coroutine_t co)
 void coroutine_free(coroutine_t co)
 {
     if(!co)
-    {
-        fprintf(stderr, "coroutine_free(): coroutine 'co' must not be null.\n");
         return;
-    }
-    else if(co->state == STATE_STARTED)
+    if((co->state & COROUTINE_STARTED) && !(co->state & COROUTINE_FINISHED))
     {
         fprintf(stderr, "coroutine_free(): coroutine 'co' must be terminated or unstarted.\n");
         return;

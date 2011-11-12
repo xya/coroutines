@@ -5,48 +5,45 @@
 .globl coroutine_terminated
 
 // void *coroutine_switch(coroutine_t co, void *arg);
+// rdi: co, rsi: arg, rax: current, rdx: state
 coroutine_switch:   .globl coroutine_switch
 // save the current context (stack, return address and registers)
-    cmpl $2, (%rdi)         # is the coroutine finished?
-    je coroutine_error
-    movq %rsi, %rdx
-    movq current, %rsi
-    popq 8(%rsi)            # current->pc = return address of the caller
+    movq current, %rax
+    popq 8(%rax)            # current->ret_addr = caller
     pushq %rbp
-    movq %rsp, 16(%rsi)     # current->stack = current stack
-    movq %rsi, 24(%rdi)     # co->caller = current
+    movq %rsp, 16(%rax)     # current->stack = current stack
+    movq %rax, 24(%rdi)     # co->caller = current
     movq %rdi, current      # current = co
-    cmpl $0, (%rdi)         # has the coroutine not been started before?
-    je coroutine_enter
+    movl (%rdi), %edx       # has the coroutine not been started before?
+    and $0x10000000, %edx
+    cmpl $0, %edx
+    je coroutine_entry
 
 // when rescheduled, restore the context and return the result 
 coroutine_do_resume:
     movq 16(%rdi), %rsp     # restore the coroutine`s stack
     popq %rbp               # restore rbp
-    movq %rdx, %rax         # <return value> = arg
-    jmp *8(%rdi)            # co->pc()
+    movq %rsi, %rax         # <return value> = arg
+    push 8(%rdi)            # return to co's caller
+    ret
 
 // run the dest coroutine (for the first time)
-coroutine_enter:
-    movl $1, (%rdi)         # co->state = STARTED
+coroutine_entry:
+    orl $0x10000000, (%rdi) # co->state |= STARTED
     movq 16(%rdi), %rsp     # switch to coroutine`s stack
     pushq %rdi
-    movq %rdi, %rax
-    movq %rdx, %rdi
-    call *32(%rax)          # co->entry(arg)
+    movq %rdi, %rdx         # co->entry(arg)
+    movq %rsi, %rdi
+    call *32(%rdx)
 
 // the coroutine exited, switch back to its last caller
-coroutine_exit:
     popq %rdi
     movq 24(%rdi), %rsi     # get the last caller
     movq 16(%rsi), %rsp     # restore its stack
     popq %rbp
-    pushq %rsi              # XXX is that needed?
+    pushq %rsi
     call coroutine_terminated
-    popq %rsi               # XXX is that needed?
-    movq $0, %rax
-    jmp *8(%rsi)            # caller->pc()
-
-coroutine_error:
-    movq $0, %rax
+    popq %rsi
+    movq $0, %rax           # <return value> = 0
+    push 8(%rsi)            # return to the last caller
     ret
