@@ -86,7 +86,7 @@ int try_schedule_task(convolution_task *task)
     if(barrier && barrier->task_left)
         return 0;
     // resume the task.
-    result = coroutine_resume(data->ctx, task->co, task);
+    result = coroutine_resume(task->co, task);
     if(result != YIELD_BARRIER)
         return 1;
     // if the task is waiting for a barrier, decrement the count

@@ -27,7 +27,7 @@ void *coroutine_yield(coroutine_context_t ctx, coroutine_arg_t arg);
 // to coroutine_yield() or a NULL pointer if the coroutine finished executing.
 // The first argument passed to every coroutine is 'user_ctx', the second 'arg'
 // If 'user_ctx' is NULL, then the coroutine_context_t is passed instead.
-void *coroutine_resume(coroutine_context_t ctx, coroutine_t co, coroutine_arg_t arg);
+void *coroutine_resume(coroutine_t co, coroutine_arg_t arg);
 
 // Return the currently executing coroutine.
 coroutine_t coroutine_current(coroutine_context_t ctx);

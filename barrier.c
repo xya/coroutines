@@ -75,7 +75,7 @@ int try_schedule_task(task_t *task)
     if(barrier && barrier->task_left)
         return 0;
     // resume the task.
-    result = coroutine_resume(list->ctx, task->co, task);
+    result = coroutine_resume(task->co, task);
     if(result != YIELD_BARRIER)
         return 1;
     // if the task is waiting for a barrier, decrement the count

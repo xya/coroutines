@@ -18,8 +18,8 @@ void foo(coroutine_context_t ctx, void *arg)
     printf("entering foo\n");
     coroutine_t co_bar = coroutine_create(ctx, (coroutine_func_t)bar);
     coroutine_t co_baz = coroutine_create(ctx, (coroutine_func_t)baz);
-    coroutine_resume(ctx, co_bar, NULL);
-    coroutine_resume(ctx, co_baz, co_bar);
+    coroutine_resume(co_bar, NULL);
+    coroutine_resume(co_baz, co_bar);
     printf("leaving foo\n");
     coroutine_free(co_bar);
     coroutine_free(co_baz);
@@ -36,6 +36,6 @@ void baz(coroutine_context_t ctx, void *arg)
 {
     coroutine_t co_bar = (coroutine_t)arg;
     printf("entering baz\n");
-    coroutine_resume(ctx, co_bar, NULL);
+    coroutine_resume(co_bar, NULL);
     printf("leaving baz\n");
 }

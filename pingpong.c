@@ -19,7 +19,7 @@ void ping(coroutine_context_t ctx, void *arg)
     do
     {
         printf("ping! %zi\n", n);
-        n = (uintptr_t)coroutine_resume(ctx, co_pong, (void *)(n + 1));
+        n = (uintptr_t)coroutine_resume(co_pong, (void *)(n + 1));
     }
     while(coroutine_alive(co_pong));
     coroutine_free(co_pong);

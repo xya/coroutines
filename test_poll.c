@@ -115,8 +115,8 @@ void send_receive(SendReceiveOptions *opts, coroutine_arg_t arg)
     coroutine_t receiver = coroutine_create(opts->ctx, (coroutine_func_t)receive_file);
     io_op *op[2] = {NULL, NULL};
     
-    op[0] = coroutine_resume(opts->ctx, sender, opts);
-    op[1] = coroutine_resume(opts->ctx, receiver, opts);
+    op[0] = coroutine_resume(sender, opts);
+    op[1] = coroutine_resume(receiver, opts);
     while(op[0] || op[1])
     {
         fill_fd_sets(opts, op, 2);
@@ -128,7 +128,7 @@ void send_receive(SendReceiveOptions *opts, coroutine_arg_t arg)
         for(int i = 0; i < 2; i++)
         {
             if(op_ready(opts, op[i]))
-                op[i] = coroutine_resume(opts->ctx, op[i]->co, NULL);
+                op[i] = coroutine_resume(op[i]->co, NULL);
         }
     }
     coroutine_free(sender);

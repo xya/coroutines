@@ -127,14 +127,9 @@ coroutine_t coroutine_create(coroutine_context_t ctx, coroutine_func_t f)
     coroutine_t co = NULL;
     void *stack = NULL;
     
-    if(!ctx)
+    if(!coroutine_current(ctx))
     {
-        fprintf(stderr, "coroutine_create(): the context is null.\n");
-        return NULL;
-    }
-    else if(!coroutine_current(ctx))
-    {
-        fprintf(stderr, "coroutine_create(): no coroutine is executing.\n");
+        fprintf(stderr, "coroutine_create(): no coroutine is executing in the context.\n");
         return NULL;
     }
     
@@ -159,15 +154,10 @@ coroutine_t coroutine_create(coroutine_context_t ctx, coroutine_func_t f)
 void *coroutine_yield(coroutine_context_t ctx, coroutine_arg_t arg)
 {
     coroutine_t cur = NULL, caller = NULL;
-    if(!ctx)
-    {
-        fprintf(stderr, "coroutine_yield(): the context is null.\n");
-        return NULL;
-    }
     cur = coroutine_current(ctx);
     if(!cur)
     {
-        fprintf(stderr, "coroutine_yield(): no coroutine is executing.\n");
+        fprintf(stderr, "coroutine_yield(): no coroutine is executing in the context.\n");
         return NULL;
     }
     caller = cur->caller;
@@ -184,22 +174,12 @@ void *coroutine_yield(coroutine_context_t ctx, coroutine_arg_t arg)
     return coroutine_switch(caller, arg, ctx);
 }
 
-void *coroutine_resume(coroutine_context_t ctx, coroutine_t co, coroutine_arg_t arg)
+void *coroutine_resume(coroutine_t co, coroutine_arg_t arg)
 {
-    //XXX use asserts
-    if(!ctx)
+    coroutine_context_t ctx  = coroutine_get_context(co);
+    if(!coroutine_current(ctx))
     {
-        fprintf(stderr, "coroutine_resume(): the context is null.\n");
-        return NULL;
-    }
-    else if(!coroutine_current(ctx))
-    {
-        fprintf(stderr, "coroutine_resume(): no coroutine is executing.\n");
-        return NULL;
-    }
-    else if(!co)
-    {
-        fprintf(stderr, "coroutine_resume(): coroutine 'co' must not be null.\n");
+        fprintf(stderr, "coroutine_resume(): no coroutine is executing in the context.\n");
         return NULL;
     }
     else if(!coroutine_alive(co))
@@ -229,5 +209,10 @@ void coroutine_free_context(coroutine_context_t ctx)
 {
     if(!ctx)
         return;
+    if(coroutine_current(ctx))
+    {
+        fprintf(stderr, "coroutine_free_current(): a coroutine is still executing in the context.\n");
+        return;
+    }
     free(ctx);
 }
