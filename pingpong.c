@@ -7,7 +7,7 @@ void pong(coroutine_context_t ctx, void *arg);
 
 int main(int argc, char **argv)
 {
-    coroutine_context_t ctx = coroutine_create_context(0, NULL);
+    coroutine_context_t ctx = coroutine_create_context(0);
     coroutine_main(ctx, (coroutine_func_t)ping, NULL);
     coroutine_free_context(ctx);
 }

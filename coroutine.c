@@ -1,6 +1,7 @@
 #include <malloc.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <assert.h>
 #include "coroutine.h"
 
 struct _coroutine_context
@@ -12,33 +13,43 @@ struct _coroutine_context
 
 struct _coroutine
 {
-    int state;              // XXX ctx
-    void *ret_addr;         // return address of coroutine_switch's caller
-    void *stack;            // the coroutine's stack
-    coroutine_t caller;     // the coroutine which resumed this one
-    coroutine_func_t entry; // XXX union with previous
+    intptr_t ctx_state;         // co's context + state (3 lower bits)
+    void *ret_addr;             // return address of coroutine_switch's caller
+    void *stack;                // the coroutine's stack
+    coroutine_t caller;         // the coroutine which resumed this one
+    coroutine_func_t entry;     // XXX union with previous
     void *orig_stack;
     coroutine_arg_t user_data;
 };
 
-#define COROUTINE_STARTED       0x10000000
-#define COROUTINE_FINISHED      0x80000000
-#define COROUTINE_USER          0x0fffffff
+#define COROUTINE_STARTED       (intptr_t)0x1
+#define COROUTINE_FINISHED      (intptr_t)0x2
+#define COROUTINE_RESERVED      (intptr_t)0x4
+
+#define COROUTINE_STATE_MASK    (intptr_t)(COROUTINE_STARTED  | \
+                                           COROUTINE_FINISHED | \
+                                           COROUTINE_RESERVED)
 
 #define COROUTINE_STACK_SIZE    4096
 
 extern void *coroutine_switch(coroutine_t co, coroutine_arg_t arg, coroutine_context_t ctx);
 
-coroutine_context_t coroutine_create_context(size_t stack_size, coroutine_arg_t user_ctx)
+coroutine_context_t coroutine_create_context(size_t stack_size)
 {
-    coroutine_context_t ctx = (coroutine_context_t)malloc(sizeof(struct _coroutine_context));
+    coroutine_context_t ctx = (coroutine_context_t)memalign(8, sizeof(struct _coroutine_context));
     if(!ctx)
         return NULL;
+    if((intptr_t)ctx & COROUTINE_STATE_MASK)
+    {
+        assert(0 && "Allocated memory was not properly 8-byte aligned.");
+        free(ctx);
+        return NULL;
+    }
     if(stack_size < COROUTINE_STACK_SIZE)
         stack_size = COROUTINE_STACK_SIZE;
     ctx->current = NULL;
     ctx->stack_size = stack_size;
-    coroutine_set_context_data(ctx, user_ctx);
+    coroutine_set_context_data(ctx, NULL);
     return ctx;
 }
 
@@ -47,9 +58,14 @@ coroutine_t coroutine_current(coroutine_context_t ctx)
     return ctx ? ctx->current : NULL;
 }
 
+coroutine_context_t coroutine_get_context(coroutine_t co)
+{
+    return co ? (coroutine_context_t)(co->ctx_state & ~COROUTINE_STATE_MASK) : NULL;
+}
+
 int coroutine_alive(coroutine_t co)
 {
-    return co && ((co->state & COROUTINE_FINISHED) == 0);
+    return co && !(co->ctx_state & COROUTINE_FINISHED);
 }
 
 coroutine_arg_t coroutine_get_context_data(coroutine_context_t ctx)
@@ -76,6 +92,7 @@ void coroutine_set_data(coroutine_t co, coroutine_arg_t data)
 
 void coroutine_main(coroutine_context_t ctx, coroutine_func_t f, coroutine_arg_t arg)
 {
+    coroutine_t co = NULL;
     if(!ctx)
     {
         fprintf(stderr, "coroutine_main(): the context is null.\n");
@@ -88,8 +105,8 @@ void coroutine_main(coroutine_context_t ctx, coroutine_func_t f, coroutine_arg_t
     }
     
     // create a coroutine for the 'main' function
-    coroutine_t co = (coroutine_t)malloc(sizeof(struct _coroutine));
-    co->state = COROUTINE_STARTED;
+    co = (coroutine_t)memalign(8, sizeof(struct _coroutine));
+    co->ctx_state = (intptr_t)ctx | COROUTINE_STARTED;
     co->entry = f;
     co->ret_addr = NULL;
     co->caller = NULL;
@@ -99,7 +116,7 @@ void coroutine_main(coroutine_context_t ctx, coroutine_func_t f, coroutine_arg_t
     
     // execute it
     co->entry(ctx->user_ctx, arg);
-    co->state |= COROUTINE_FINISHED;
+    co->ctx_state |= COROUTINE_FINISHED;
     ctx->current = co->caller = NULL;
     coroutine_free(co);
 }
@@ -107,8 +124,8 @@ void coroutine_main(coroutine_context_t ctx, coroutine_func_t f, coroutine_arg_t
 coroutine_t coroutine_create(coroutine_context_t ctx, coroutine_func_t f)
 {
     // create a coroutine for the function
-    coroutine_t co;
-    void *stack;
+    coroutine_t co = NULL;
+    void *stack = NULL;
     
     if(!ctx)
     {
@@ -121,7 +138,7 @@ coroutine_t coroutine_create(coroutine_context_t ctx, coroutine_func_t f)
         return NULL;
     }
     
-    co = (coroutine_t)malloc(sizeof(struct _coroutine));
+    co = (coroutine_t)memalign(8, sizeof(struct _coroutine));
     if(!co)
         return NULL;
     stack = malloc(ctx->stack_size);
@@ -130,7 +147,7 @@ coroutine_t coroutine_create(coroutine_context_t ctx, coroutine_func_t f)
         free(co);
         return NULL;
     }
-    co->state = 0;
+    co->ctx_state = (intptr_t)ctx;
     co->entry = f;
     co->ret_addr = NULL;
     co->caller = NULL;
@@ -169,6 +186,7 @@ void *coroutine_yield(coroutine_context_t ctx, coroutine_arg_t arg)
 
 void *coroutine_resume(coroutine_context_t ctx, coroutine_t co, coroutine_arg_t arg)
 {
+    //XXX use asserts
     if(!ctx)
     {
         fprintf(stderr, "coroutine_resume(): the context is null.\n");
@@ -196,7 +214,7 @@ void coroutine_free(coroutine_t co)
 {
     if(!co)
         return;
-    if((co->state & COROUTINE_STARTED) && !(co->state & COROUTINE_FINISHED))
+    if((co->ctx_state & COROUTINE_STARTED) && !(co->ctx_state & COROUTINE_FINISHED))
     {
         fprintf(stderr, "coroutine_free(): coroutine 'co' must be terminated or unstarted.\n");
         return;

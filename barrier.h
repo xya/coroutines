@@ -35,9 +35,9 @@ void alloc_tasks(task_list_t list);
 void dispose_tasks(task_list_t list);
 void do_task(task_list_t list, task_t *task);
 
-int try_schedule_task(task_list_t list, task_t *task);
-barrier_t* task_current_barrier(task_list_t list, task_t *task);
-void task_unset_barrier(task_list_t list, task_t *task, barrier_t *barrier);
-void wait_at_barrier(task_list_t list, task_t *task, uint32_t barrier_id);
+int try_schedule_task(task_t *task);
+barrier_t* task_current_barrier(task_t *task);
+void task_unset_barrier(task_t *task, barrier_t *barrier);
+void wait_at_barrier(task_t *task, uint32_t barrier_id);
 
 #endif

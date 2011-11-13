@@ -4,7 +4,7 @@
 .globl current
 
 // void *coroutine_switch(coroutine_t co, void *arg);
-// ecx: co eax: current/arg edx: ctx/state
+// ecx: co eax: current/arg edx: ctx
 coroutine_switch:   .globl coroutine_switch
 // save the current context (stack, return address and registers)
     movl 12(%esp), %edx       # load ctx
@@ -16,12 +16,8 @@ coroutine_switch:   .globl coroutine_switch
     push %ebp                 # save stack frame
     movl %esp, 8(%eax)        # current->stack = current stack
     movl 8(%esp), %eax        # load arg
-    push %edx                 # state = co->state
-    movl (%ecx), %edx         # ...
-    and $0x10000000, %edx     # state &= STARTED
-    cmpl $0, %edx             # if(state == 0)
-    pop %edx                  # ...
-    je coroutine_entry        #   call coroutine_entry
+    testl $0x1, (%ecx)        # if(!(co->ctx_state & STARTED))
+    jz coroutine_entry        #   call coroutine_entry
 
 // void *coroutine_return(coroutine_t co, void *arg, coroutine_context_t ctx)
 // ecx: co, eax: arg, edx: ctx
@@ -35,7 +31,7 @@ coroutine_return:
 // run the dest coroutine (for the first time)
 coroutine_entry:
 // ecx: co, eax: arg, edx: ctx
-    orl $0x10000000, (%ecx) # co->state |= STARTED
+    orl $0x1, (%ecx)        # co->state |= STARTED
     movl 8(%ecx), %esp      # switch to coroutine's stack
     push %ecx               # save co
     push %edx               # save ctx
@@ -48,7 +44,7 @@ coroutine_entry:
     add $8, %esp            # clean the stack after the call
     pop %edx                # restore ctx
     pop %eax                # restore co
-    orl $0x80000000, (%eax) # co->state |= FINISHED
+    orl $0x2, (%eax)        # co->state |= FINISHED
     movl 12(%eax), %ecx     # current = co->caller
     movl %ecx, (%edx)       # ...
     movl $0, 12(%eax)       # co->caller = NULL

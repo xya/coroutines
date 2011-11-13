@@ -19,7 +19,8 @@ typedef struct
 {
     convolution_data data;
     coroutine_t co;
-    uint32_t id;
+    uint16_t id;
+    uint16_t barrier;
     uint32_t padding[1];
 } convolution_task;
 
@@ -48,9 +49,9 @@ void convolution_prepare_data(convolution_data data);
 void convolution_dispose_data(convolution_data data);
 void do_convolution_task(convolution_data data, convolution_task *task);
 
-int try_schedule_task(convolution_data data, convolution_task *task);
-barrier_t* task_current_barrier(convolution_data data, convolution_task *task);
-void task_unset_barrier(convolution_data data, convolution_task *task, barrier_t *barrier);
-void wait_at_barrier(convolution_data data, uint32_t barrier_id);
+int try_schedule_task(convolution_task *task);
+barrier_t* task_current_barrier(convolution_task *task);
+void task_unset_barrier(convolution_task *task, barrier_t *barrier);
+void wait_at_barrier(convolution_task *task, uint32_t barrier_id);
 
 #endif

@@ -3,7 +3,7 @@
 .arm
 
 @ void *coroutine_switch(coroutine_t co, void *arg, coroutine_context_t ctx);
-@ r0: co, r1: arg, r2: ctx, r3: current, r14: state
+@ r0: co, r1: arg, r2: ctx, r3: current, r14: ctx_state
 .globl coroutine_switch
 coroutine_switch:
 @ save the current context (stack, return address and registers)
@@ -11,11 +11,11 @@ coroutine_switch:
     str r0, [r2]                @ ctx->current = co
     push {fp}                   @ save stack frame
     str lr, [r3]                @ current->ret_addr = caller
-    ldr r14, [r0]               @ state = co->state
+    ldr r14, [r0]               @ ctx_state = co->ctx_state
     str r3, [r0, #12]           @ co->caller = current
     str sp, [r3, #8]            @ current->stack = stack pointer
-    ands r14, r14, #0x10000000  @ call coroutine_entry if co hasn't started yet
-    beq coroutine_entry
+    ands r14, r14, #0x1         @ if(!(co->ctx_state & STARTED))
+    beq coroutine_entry         @   call coroutine_entry
 
 @ void *coroutine_return(coroutine_t co, void *arg, coroutine_context_t ctx)
 @ r0: co, r1: arg, r2: ctx
@@ -28,11 +28,11 @@ coroutine_return:
 @ void coroutine_entry(coroutine_t co, void *arg, coroutine_context_t ctx) no_return
 @ run the dest coroutine (for the first time)
 coroutine_entry:
-@ r0: co, r1: arg, r2: entry, r3: ctx, r14: state
-    ldr r14, [r0]               @ co->state |= STARTED
+@ r0: co, r1: arg, r2: entry, r3: ctx, r14: ctx_state
+    ldr r14, [r0]               @ co->ctx_state |= STARTED
     ldr sp, [r0, #8]            @ switch to coroutine's stack
-    orr r14, r14, #0x10000000   @ co->state |= STARTED
-    str r14, [r0]               @ co->state |= STARTED
+    orr r14, r14, #0x1          @ co->ctx_state |= STARTED
+    str r14, [r0]               @ co->ctx_state |= STARTED
     mov r2, r0                  @ co->entry(ctx->user, arg)
     ldr r0, [r3, #8]            @ ...
     ldr r2, [r2, #16]           @ ...
@@ -40,10 +40,10 @@ coroutine_entry:
     bl r2                       @ co->entry(ctx->user, arg)
 
 @ the coroutine exited, switch back to its last caller
-@ r0: caller, r1/r3: co, r2: ctx, r14: state
+@ r0: caller, r1/r3: co, r2: ctx, r14: ctx_state
     ldmfd sp!, {r1, r2}         @ restore co and ctx
-    ldr r14, [r1]               @ co->state |= FINISHED
-    orr r14, r14, #0x80000000   @ ...
+    ldr r14, [r1]               @ co->ctx_state |= FINISHED
+    orr r14, r14, #0x2          @ ...
     str r14, [r1]               @ ...
     mov r3, r1
     ldr r0, [r3, #12]           @ current = co->caller

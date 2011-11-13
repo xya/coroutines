@@ -96,7 +96,8 @@ int main(int argc, char **argv)
     blocking_mode(opts.pipe[1], 0);
     opts.sent = 0;
     opts.received = 0;
-    opts.ctx = coroutine_create_context(4096 * 2, &opts);
+    opts.ctx = coroutine_create_context(4096 * 2);
+    coroutine_set_context_data(opts.ctx, &opts);
     
     start = clock();
     coroutine_main(opts.ctx, (coroutine_func_t)send_receive, NULL);
