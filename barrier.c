@@ -9,10 +9,12 @@ int main(int argc, char **argv)
     struct _task_list list;
     memset(&list, 0, sizeof(struct _task_list));
     list.task_count = 8;
-    coroutine_main((coroutine_func)tasks_main, &list);
+    list.ctx = coroutine_create_context(0, &list);
+    coroutine_main(list.ctx, (coroutine_func_t)tasks_main, NULL);
+    coroutine_free_context(list.ctx);
 }
 
-void tasks_main(task_list_t list)
+void tasks_main(task_list_t list, coroutine_arg_t arg)
 {
     uint32_t i, tasks_scheduled;
     alloc_tasks(list);
@@ -38,7 +40,7 @@ void alloc_tasks(task_list_t list)
     for(i = 0; i < list->task_count; i++)
     {
         task = list->tasks + i;
-        task->co = coroutine_create((coroutine_func)do_task, 0);
+        task->co = coroutine_create(list->ctx, (coroutine_func_t)do_task);
         task->id = i;
     }
     for(i = 0; i < MAX_BARRIERS; i++)
@@ -64,7 +66,7 @@ int try_schedule_task(task_list_t list, task_t *task)
     if(barrier && barrier->task_left)
         return 0;
     // resume the task.
-    result = coroutine_resume(task->co, task);
+    result = coroutine_resume(list->ctx, task->co, task);
     if(result != YIELD_BARRIER)
         return 1;
     // if the task is waiting for a barrier, decrement the count
@@ -78,10 +80,10 @@ int try_schedule_task(task_list_t list, task_t *task)
     return 1;
 }
 
-void wait_at_barrier(uint32_t barrier_id)
+void wait_at_barrier(task_list_t list, uint32_t barrier_id)
 {
-    coroutine_set_user_state(coroutine_current(), barrier_id);
-    coroutine_yield(YIELD_BARRIER);
+    coroutine_set_user_state(coroutine_current(list->ctx), barrier_id);
+    coroutine_yield(list->ctx, YIELD_BARRIER);
 }
 
 barrier_t* task_current_barrier(task_list_t list, task_t *task)
@@ -102,18 +104,18 @@ void task_unset_barrier(task_list_t list, task_t *task, barrier_t *barrier)
         coroutine_set_user_state(task->co, 0);
 }
 
-void do_task(task_t *task)
+void do_task(task_list_t list, task_t *task)
 {
     printf("%02d: part A\n", task->id);
     if(task->id % 2)
     {
-        coroutine_yield(YIELD_PAUSE);
+        coroutine_yield(list->ctx, YIELD_PAUSE);
         printf("%02d: part B\n", task->id);
-        wait_at_barrier(1);
+        wait_at_barrier(list, 1);
     }
     else
     {
-        wait_at_barrier(1);
+        wait_at_barrier(list, 1);
         printf("%02d: part B\n", task->id);
     }
     printf("%02d: part C\n", task->id);

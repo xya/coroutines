@@ -2,38 +2,40 @@
 #include <inttypes.h>
 #include "coroutine.h"
 
-void foo(void *arg);
-void bar(void *arg);
-void baz(void *arg);
+void foo(coroutine_context_t ctx, void *arg);
+void bar(coroutine_context_t ctx, void *arg);
+void baz(coroutine_context_t ctx, void *arg);
 
 int main(int argc, char **argv)
 {
-    coroutine_main(foo, NULL);
+    coroutine_context_t ctx = coroutine_create_context(0, NULL);
+    coroutine_main(ctx, (coroutine_func_t)foo, NULL);
+    coroutine_free_context(ctx);
 }
 
-void foo(void *arg)
+void foo(coroutine_context_t ctx, void *arg)
 {
     printf("entering foo\n");
-    coroutine_t co_bar = coroutine_create(bar, 0);
-    coroutine_t co_baz = coroutine_create(baz, 0);
-    coroutine_resume(co_bar, NULL);
-    coroutine_resume(co_baz, co_bar);
+    coroutine_t co_bar = coroutine_create(ctx, (coroutine_func_t)bar);
+    coroutine_t co_baz = coroutine_create(ctx, (coroutine_func_t)baz);
+    coroutine_resume(ctx, co_bar, NULL);
+    coroutine_resume(ctx, co_baz, co_bar);
     printf("leaving foo\n");
     coroutine_free(co_bar);
     coroutine_free(co_baz);
 }
 
-void bar(void *arg)
+void bar(coroutine_context_t ctx, void *arg)
 {
     printf("entering bar\n");
-    coroutine_yield(NULL);
+    coroutine_yield(ctx, NULL);
     printf("leaving bar\n");
 }
 
-void baz(void *arg)
+void baz(coroutine_context_t ctx, void *arg)
 {
     coroutine_t co_bar = (coroutine_t)arg;
     printf("entering baz\n");
-    coroutine_resume(co_bar, NULL);
+    coroutine_resume(ctx, co_bar, NULL);
     printf("leaving baz\n");
 }

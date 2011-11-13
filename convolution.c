@@ -13,10 +13,12 @@ int main(int argc, char **argv)
     data.dst_width = DST_WIDTH;
     data.dst_height = DST_HEIGHT;
     data.task_count = data.src_height;
-    coroutine_main((coroutine_func)convolution_main, &data);
+    data.ctx = coroutine_create_context(0, &data);
+    coroutine_main(data.ctx, (coroutine_func_t)convolution_main, NULL);
+    coroutine_free_context(data.ctx);
 }
 
-void convolution_main(convolution_data data)
+void convolution_main(convolution_data data, coroutine_arg_t arg)
 {
     uint32_t i, tasks_scheduled;
     convolution_prepare_data(data);
@@ -47,7 +49,7 @@ void convolution_prepare_data(convolution_data data)
     {
         task = data->tasks + i;
         task->data = data;
-        task->co = coroutine_create((coroutine_func)do_convolution_task, 0);
+        task->co = coroutine_create(data->ctx, (coroutine_func_t)do_convolution_task);
         task->id = i;
     }
     for(i = 0; i < MAX_BARRIERS; i++)
@@ -76,7 +78,7 @@ int try_schedule_task(convolution_data data, convolution_task *task)
     if(barrier && barrier->task_left)
         return 0;
     // resume the task.
-    result = coroutine_resume(task->co, task);
+    result = coroutine_resume(data->ctx, task->co, task);
     if(result != YIELD_BARRIER)
         return 1;
     // if the task is waiting for a barrier, decrement the count
@@ -90,10 +92,10 @@ int try_schedule_task(convolution_data data, convolution_task *task)
     return 1;
 }
 
-void wait_at_barrier(uint32_t barrier_id)
+void wait_at_barrier(convolution_data data, uint32_t barrier_id)
 {
-    coroutine_set_user_state(coroutine_current(), barrier_id);
-    coroutine_yield(YIELD_BARRIER);
+    coroutine_set_user_state(coroutine_current(data->ctx), barrier_id);
+    coroutine_yield(data->ctx, YIELD_BARRIER);
 }
 
 barrier_t* task_current_barrier(convolution_data data, convolution_task *task)
@@ -114,18 +116,18 @@ void task_unset_barrier(convolution_data data, convolution_task *task, barrier_t
         coroutine_set_user_state(task->co, 0);
 }
 
-void do_convolution_task(convolution_task *task)
+void do_convolution_task(convolution_data data, convolution_task *task)
 {
     printf("%02d: part A\n", task->id);
     if(task->id % 2)
     {
-        coroutine_yield(YIELD_PAUSE);
+        coroutine_yield(data->ctx, YIELD_PAUSE);
         printf("%02d: part B\n", task->id);
-        wait_at_barrier(1);
+        wait_at_barrier(data, 1);
     }
     else
     {
-        wait_at_barrier(1);
+        wait_at_barrier(data, 1);
         printf("%02d: part B\n", task->id);
     }
     printf("%02d: part C\n", task->id);

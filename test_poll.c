@@ -42,6 +42,7 @@ typedef struct
     int pipe[2];
     size_t sent;
     size_t received;
+    coroutine_context_t ctx;
 } SendReceiveOptions;
 
 typedef struct
@@ -61,14 +62,14 @@ typedef struct
     uint16_t block_size;
 } BlockHeader;
 
-void send_receive(void *arg);
+void send_receive(SendReceiveOptions *opts, coroutine_arg_t arg);
 void fill_fd_sets(SendReceiveOptions *opts, io_op **ops, int opcount);
 int op_ready(SendReceiveOptions *opts, io_op *op);
 int blocking_mode(int fd, int blocking);
-ssize_t coroutine_read(int fd, void *buffer, size_t size);
-ssize_t coroutine_write(int fd, void *buffer, size_t size);
-void send_file(void *arg);
-void receive_file(void *arg);
+ssize_t coroutine_read(coroutine_context_t ctx, int fd, void *buffer, size_t size);
+ssize_t coroutine_write(coroutine_context_t ctx, int fd, void *buffer, size_t size);
+void send_file(SendReceiveOptions *opts, coroutine_arg_t arg);
+void receive_file(SendReceiveOptions *opts, coroutine_arg_t arg);
 void set_msg_size(BlockHeader *bh);
 
 int main(int argc, char **argv)
@@ -77,6 +78,7 @@ int main(int argc, char **argv)
     clock_t start, duration;
     double sec, speed;
     SendReceiveOptions opts;
+    coroutine_context_t ctx = NULL;
     
     if(argc < 2)
     {
@@ -94,25 +96,26 @@ int main(int argc, char **argv)
     blocking_mode(opts.pipe[1], 0);
     opts.sent = 0;
     opts.received = 0;
+    opts.ctx = coroutine_create_context(4096 * 2, &opts);
     
     start = clock();
-    coroutine_main(send_receive, &opts);
+    coroutine_main(opts.ctx, (coroutine_func_t)send_receive, NULL);
     duration = clock() - start;
     sec = ((double)duration / (double)CLOCKS_PER_SEC);
     speed = ((double)opts.received / (1024.0 * 1024.0)) / sec;
     printf("Sent %zi bytes in %f seconds (%f MiB/s)\n", opts.received, sec, speed);
+    coroutine_free_context(ctx);
     return 0;
 }
 
-void send_receive(void *arg)
+void send_receive(SendReceiveOptions *opts, coroutine_arg_t arg)
 {
-    SendReceiveOptions *opts = (SendReceiveOptions *)arg;
-    coroutine_t sender = coroutine_create(send_file, 4096 * 2);
-    coroutine_t receiver = coroutine_create(receive_file, 4096 * 2);
+    coroutine_t sender = coroutine_create(opts->ctx, (coroutine_func_t)send_file);
+    coroutine_t receiver = coroutine_create(opts->ctx, (coroutine_func_t)receive_file);
     io_op *op[2] = {NULL, NULL};
     
-    op[0] = coroutine_resume(sender, opts);
-    op[1] = coroutine_resume(receiver, opts);
+    op[0] = coroutine_resume(opts->ctx, sender, opts);
+    op[1] = coroutine_resume(opts->ctx, receiver, opts);
     while(op[0] || op[1])
     {
         fill_fd_sets(opts, op, 2);
@@ -124,7 +127,7 @@ void send_receive(void *arg)
         for(int i = 0; i < 2; i++)
         {
             if(op_ready(opts, op[i]))
-                op[i] = coroutine_resume(op[i]->co, NULL);
+                op[i] = coroutine_resume(opts->ctx, op[i]->co, NULL);
         }
     }
     coroutine_free(sender);
@@ -175,7 +178,7 @@ int blocking_mode(int fd, int blocking)
     return (old_mode & flag) == 0;
 }
 
-ssize_t coroutine_read(int fd, void *buffer, size_t size)
+ssize_t coroutine_read(coroutine_context_t ctx, int fd, void *buffer, size_t size)
 {
     io_op op;
     ssize_t bytesRead;
@@ -193,12 +196,12 @@ ssize_t coroutine_read(int fd, void *buffer, size_t size)
         // yield and pass the details
         op.fd = fd;
         op.is_read = 1;
-        op.co = coroutine_current();
-        coroutine_yield(&op);
+        op.co = coroutine_current(ctx);
+        coroutine_yield(ctx, &op);
     }
 }
 
-ssize_t coroutine_write(int fd, void *buffer, size_t size)
+ssize_t coroutine_write(coroutine_context_t ctx,int fd, void *buffer, size_t size)
 {
     io_op op;
     ssize_t bytesWritten;
@@ -216,14 +219,13 @@ ssize_t coroutine_write(int fd, void *buffer, size_t size)
         // yield and pass the details
         op.fd = fd;
         op.is_read = 0;
-        op.co = coroutine_current();
-        coroutine_yield(&op);
+        op.co = coroutine_current(ctx);
+        coroutine_yield(ctx, &op);
     }
 }
 
-void send_file(void *arg)
+void send_file(SendReceiveOptions *opts, coroutine_arg_t arg)
 {
-    SendReceiveOptions *opts = (SendReceiveOptions *)arg;
     BlockHeader bh;
     uint32_t blockID = 0;
     char buffer[BUFFER_SIZE];
@@ -237,14 +239,14 @@ void send_file(void *arg)
     bh.transfer_id = 0;
     while(1)
     {
-        readBytes = coroutine_read(r, buffer, sizeof(buffer));
+        readBytes = coroutine_read(opts->ctx, r, buffer, sizeof(buffer));
         if(readBytes == 0)
             break;
         bh.block_id = blockID++;
         bh.block_size = readBytes;
         set_msg_size(&bh);
-        coroutine_write(opts->pipe[1], &bh, sizeof(BlockHeader));
-        coroutine_write(opts->pipe[1], buffer, readBytes);
+        coroutine_write(opts->ctx, opts->pipe[1], &bh, sizeof(BlockHeader));
+        coroutine_write(opts->ctx, opts->pipe[1], buffer, readBytes);
         opts->sent += (size_t)readBytes;
     }
     close(r);
@@ -253,9 +255,8 @@ void send_file(void *arg)
 
 #define min(a, b) ((a) < (b)? (a) : (b))
 
-void receive_file(void *arg)
+void receive_file(SendReceiveOptions *opts, coroutine_arg_t arg)
 {
-    SendReceiveOptions *opts = (SendReceiveOptions *)arg;
     BlockHeader bh;
     char buffer[BUFFER_SIZE];
     int readBytes;
@@ -266,16 +267,16 @@ void receive_file(void *arg)
     
     while(1)
     {
-        readBytes = coroutine_read(opts->pipe[0], &bh, sizeof(BlockHeader));
+        readBytes = coroutine_read(opts->ctx, opts->pipe[0], &bh, sizeof(BlockHeader));
         if(readBytes == 0)
             break;
-        readBytes = coroutine_read(opts->pipe[0], buffer, min(bh.block_size, sizeof(buffer)));
+        readBytes = coroutine_read(opts->ctx, opts->pipe[0], buffer, min(bh.block_size, sizeof(buffer)));
         if(readBytes < bh.block_size)
         {
             fprintf(stderr, "Pipe was closed while receiving a block\n");
             break;
         }
-        coroutine_write(w, buffer, bh.block_size);
+        coroutine_write(opts->ctx, w, buffer, bh.block_size);
         opts->received += bh.block_size;
     }
     close(w);
