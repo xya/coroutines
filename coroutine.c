@@ -12,12 +12,13 @@ struct _coroutine_context
 
 struct _coroutine
 {
-    int state;              // XXX uint32
+    int state;              // XXX ctx
     void *ret_addr;         // return address of coroutine_switch's caller
-    void *stack;            // the coroutine's stack (i.e. used with ESP register)
+    void *stack;            // the coroutine's stack
     coroutine_t caller;     // the coroutine which resumed this one
-    coroutine_func_t entry;
+    coroutine_func_t entry; // XXX union with previous
     void *orig_stack;
+    coroutine_arg_t user_data;
 };
 
 #define COROUTINE_STARTED       0x10000000
@@ -37,7 +38,7 @@ coroutine_context_t coroutine_create_context(size_t stack_size, coroutine_arg_t 
         stack_size = COROUTINE_STACK_SIZE;
     ctx->current = NULL;
     ctx->stack_size = stack_size;
-    ctx->user_ctx = user_ctx ? user_ctx : ctx;
+    coroutine_set_context_data(ctx, user_ctx);
     return ctx;
 }
 
@@ -51,15 +52,26 @@ int coroutine_alive(coroutine_t co)
     return co && ((co->state & COROUTINE_FINISHED) == 0);
 }
 
-int coroutine_get_user_state(coroutine_t co)
+coroutine_arg_t coroutine_get_context_data(coroutine_context_t ctx)
 {
-    return co ? co->state & COROUTINE_USER : 0;
+    return ctx ? ctx->user_ctx : NULL;
 }
 
-void coroutine_set_user_state(coroutine_t co, int state)
+void coroutine_set_context_data(coroutine_context_t ctx, coroutine_arg_t user_ctx)
+{
+    if(ctx)
+        ctx->user_ctx = user_ctx ? user_ctx : ctx;
+}
+
+coroutine_arg_t coroutine_get_data(coroutine_t co)
+{
+    return co ? co->user_data : NULL;
+}
+
+void coroutine_set_data(coroutine_t co, coroutine_arg_t data)
 {
     if(co)
-        co->state |= (state & COROUTINE_USER);
+        co->user_data = data;
 }
 
 void coroutine_main(coroutine_context_t ctx, coroutine_func_t f, coroutine_arg_t arg)

@@ -34,7 +34,7 @@ void tasks_main(task_list_t list, coroutine_arg_t arg)
 void alloc_tasks(task_list_t list)
 {
     task_t *task = NULL;
-    uint32_t i;
+    uint16_t i;
     // initialize the tasks
     list->tasks = (task_t *)calloc(list->task_count, sizeof(task_t));
     for(i = 0; i < list->task_count; i++)
@@ -42,6 +42,7 @@ void alloc_tasks(task_list_t list)
         task = list->tasks + i;
         task->co = coroutine_create(list->ctx, (coroutine_func_t)do_task);
         task->id = i;
+        task->barrier = 0;
     }
     for(i = 0; i < MAX_BARRIERS; i++)
         list->barriers[i].task_left = list->task_count;
@@ -80,9 +81,9 @@ int try_schedule_task(task_list_t list, task_t *task)
     return 1;
 }
 
-void wait_at_barrier(task_list_t list, uint32_t barrier_id)
+void wait_at_barrier(task_list_t list, task_t *task, uint32_t barrier_id)
 {
-    coroutine_set_user_state(coroutine_current(list->ctx), barrier_id);
+    task->barrier = barrier_id;
     coroutine_yield(list->ctx, YIELD_BARRIER);
 }
 
@@ -91,7 +92,7 @@ barrier_t* task_current_barrier(task_list_t list, task_t *task)
     uint32_t id = 0;
     if(!coroutine_alive(task->co))
         return NULL;
-    id = coroutine_get_user_state(task->co);
+    id = task->barrier;
     if(!id || (id > MAX_BARRIERS))
         return NULL;
     return &list->barriers[id - 1];
@@ -101,7 +102,7 @@ void task_unset_barrier(task_list_t list, task_t *task, barrier_t *barrier)
 {
     barrier_t *current = task_current_barrier(list, task);
     if(current && (current == barrier))
-        coroutine_set_user_state(task->co, 0);
+        task->barrier = 0;
 }
 
 void do_task(task_list_t list, task_t *task)
@@ -111,11 +112,11 @@ void do_task(task_list_t list, task_t *task)
     {
         coroutine_yield(list->ctx, YIELD_PAUSE);
         printf("%02d: part B\n", task->id);
-        wait_at_barrier(list, 1);
+        wait_at_barrier(list, task, 1);
     }
     else
     {
-        wait_at_barrier(list, 1);
+        wait_at_barrier(list, task, 1);
         printf("%02d: part B\n", task->id);
     }
     printf("%02d: part C\n", task->id);
