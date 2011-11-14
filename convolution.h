@@ -44,7 +44,7 @@ struct _convolution_data
     barrier_t barriers[MAX_BARRIERS];
 };
 
-void convolution_main(convolution_data data, coroutine_arg_t arg);
+void convolution_main(convolution_data data);
 void convolution_prepare_data(convolution_data data);
 void convolution_dispose_data(convolution_data data);
 void do_convolution_task(convolution_data data, convolution_task *task);

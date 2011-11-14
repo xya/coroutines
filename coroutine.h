@@ -10,9 +10,6 @@ typedef void (*coroutine_func_t)(coroutine_arg_t ctx, coroutine_arg_t arg);
 // Create a new context to execute coroutines in.
 coroutine_context_t coroutine_create_context(size_t stack_size);
 
-// Execute a function as the main coroutine: f(user_ctx, arg).
-void coroutine_main(coroutine_context_t ctx, coroutine_func_t f, coroutine_arg_t arg);
-
 // Create a new coroutine, but don't start executing it.
 coroutine_t coroutine_create(coroutine_context_t ctx, coroutine_func_t f);
 

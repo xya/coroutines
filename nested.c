@@ -2,18 +2,18 @@
 #include <inttypes.h>
 #include "coroutine.h"
 
-void foo(coroutine_context_t ctx, void *arg);
+void foo(coroutine_context_t ctx);
 void bar(coroutine_context_t ctx, void *arg);
 void baz(coroutine_context_t ctx, void *arg);
 
 int main(int argc, char **argv)
 {
     coroutine_context_t ctx = coroutine_create_context(0);
-    coroutine_main(ctx, (coroutine_func_t)foo, NULL);
+    foo(ctx);
     coroutine_free_context(ctx);
 }
 
-void foo(coroutine_context_t ctx, void *arg)
+void foo(coroutine_context_t ctx)
 {
     printf("entering foo\n");
     coroutine_t co_bar = coroutine_create(ctx, (coroutine_func_t)bar);

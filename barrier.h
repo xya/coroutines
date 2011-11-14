@@ -30,7 +30,7 @@ struct _task_list
     barrier_t barriers[MAX_BARRIERS];
 };
 
-void tasks_main(task_list_t list, coroutine_arg_t arg);
+void tasks_main(task_list_t list);
 void alloc_tasks(task_list_t list);
 void dispose_tasks(task_list_t list);
 void do_task(task_list_t list, task_t *task);

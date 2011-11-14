@@ -7,6 +7,7 @@
 struct _coroutine_context
 {
     coroutine_t current;
+    coroutine_t main;
     size_t stack_size;
     coroutine_arg_t user_ctx;
 };
@@ -47,9 +48,18 @@ coroutine_context_t coroutine_create_context(size_t stack_size)
     }
     if(stack_size < COROUTINE_STACK_SIZE)
         stack_size = COROUTINE_STACK_SIZE;
-    ctx->current = NULL;
     ctx->stack_size = stack_size;
     coroutine_set_context_data(ctx, NULL);
+
+    // create the main coroutine
+    ctx->main = (coroutine_t)memalign(8, sizeof(struct _coroutine));
+    ctx->main->ctx_state = (intptr_t)ctx | COROUTINE_STARTED;
+    ctx->main->entry = NULL;
+    ctx->main->ret_addr = NULL;
+    ctx->main->caller = NULL;
+    ctx->main->stack = NULL;
+    ctx->main->orig_stack = NULL;
+    ctx->current = ctx->main;
     return ctx;
 }
 
@@ -88,37 +98,6 @@ void coroutine_set_data(coroutine_t co, coroutine_arg_t data)
 {
     if(co)
         co->user_data = data;
-}
-
-void coroutine_main(coroutine_context_t ctx, coroutine_func_t f, coroutine_arg_t arg)
-{
-    coroutine_t co = NULL;
-    if(!ctx)
-    {
-        fprintf(stderr, "coroutine_main(): the context is null.\n");
-        return;
-    }
-    else if(coroutine_current(ctx))
-    {
-        fprintf(stderr, "coroutine_main(): a coroutine is already executing.\n");
-        return;
-    }
-    
-    // create a coroutine for the 'main' function
-    co = (coroutine_t)memalign(8, sizeof(struct _coroutine));
-    co->ctx_state = (intptr_t)ctx | COROUTINE_STARTED;
-    co->entry = f;
-    co->ret_addr = NULL;
-    co->caller = NULL;
-    co->stack = NULL;
-    co->orig_stack = NULL;
-    ctx->current = co;
-    
-    // execute it
-    co->entry(ctx->user_ctx, arg);
-    co->ctx_state |= COROUTINE_FINISHED;
-    ctx->current = co->caller = NULL;
-    coroutine_free(co);
 }
 
 coroutine_t coroutine_create(coroutine_context_t ctx, coroutine_func_t f)
@@ -207,12 +186,20 @@ void coroutine_free(coroutine_t co)
 
 void coroutine_free_context(coroutine_context_t ctx)
 {
+    coroutine_t co = NULL;
     if(!ctx)
         return;
-    if(coroutine_current(ctx))
+    co = coroutine_current(ctx);
+    if(co && (co != ctx->main))
     {
         fprintf(stderr, "coroutine_free_current(): a coroutine is still executing in the context.\n");
         return;
+    }
+    if(ctx->main)
+    {
+        ctx->main->ctx_state |= COROUTINE_FINISHED;
+        coroutine_free(ctx->main);
+        ctx->main = NULL;
     }
     free(ctx);
 }

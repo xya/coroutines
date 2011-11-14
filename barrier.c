@@ -11,11 +11,11 @@ int main(int argc, char **argv)
     list.task_count = 8;
     list.ctx = coroutine_create_context(0);
     coroutine_set_context_data(list.ctx, &list);
-    coroutine_main(list.ctx, (coroutine_func_t)tasks_main, NULL);
+    tasks_main(&list);
     coroutine_free_context(list.ctx);
 }
 
-void tasks_main(task_list_t list, coroutine_arg_t arg)
+void tasks_main(task_list_t list)
 {
     uint32_t i, tasks_scheduled;
     task_t *t = NULL;

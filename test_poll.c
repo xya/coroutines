@@ -62,7 +62,7 @@ typedef struct
     uint16_t block_size;
 } BlockHeader;
 
-void send_receive(SendReceiveOptions *opts, coroutine_arg_t arg);
+void send_receive(SendReceiveOptions *opts);
 void fill_fd_sets(SendReceiveOptions *opts, io_op **ops, int opcount);
 int op_ready(SendReceiveOptions *opts, io_op *op);
 int blocking_mode(int fd, int blocking);
@@ -100,7 +100,7 @@ int main(int argc, char **argv)
     coroutine_set_context_data(opts.ctx, &opts);
     
     start = clock();
-    coroutine_main(opts.ctx, (coroutine_func_t)send_receive, NULL);
+    send_receive(&opts);
     duration = clock() - start;
     sec = ((double)duration / (double)CLOCKS_PER_SEC);
     speed = ((double)opts.received / (1024.0 * 1024.0)) / sec;
@@ -109,7 +109,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void send_receive(SendReceiveOptions *opts, coroutine_arg_t arg)
+void send_receive(SendReceiveOptions *opts)
 {
     coroutine_t sender = coroutine_create(opts->ctx, (coroutine_func_t)send_file);
     coroutine_t receiver = coroutine_create(opts->ctx, (coroutine_func_t)receive_file);

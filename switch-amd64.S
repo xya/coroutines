@@ -30,7 +30,7 @@ coroutine_entry:
     movq 16(%rdi), %rsp     # switch to coroutine`s stack
     pushq %rdi              # save co
     movq %rdi, %rcx         # co->entry(ctx->user, arg)
-    movq 16(%rdx), %rdi
+    movq 24(%rdx), %rdi
     call *32(%rcx)
 
 // the coroutine exited, switch back to its last caller

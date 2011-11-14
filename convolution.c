@@ -15,11 +15,11 @@ int main(int argc, char **argv)
     data.task_count = data.src_height;
     data.ctx = coroutine_create_context(0);
     coroutine_set_context_data(data.ctx, &data);
-    coroutine_main(data.ctx, (coroutine_func_t)convolution_main, NULL);
+    convolution_main(&data);
     coroutine_free_context(data.ctx);
 }
 
-void convolution_main(convolution_data data, coroutine_arg_t arg)
+void convolution_main(convolution_data data)
 {
     uint32_t i, tasks_scheduled;
     convolution_task *t = NULL;
