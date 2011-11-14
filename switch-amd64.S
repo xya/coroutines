@@ -29,15 +29,15 @@ coroutine_entry:
     orq $0x1, (%rdi)        # co->state |= STARTED
     movq 16(%rdi), %rsp     # switch to coroutine`s stack
     pushq %rdi              # save co
-    pushq %rdx              # save ctx
     movq %rdi, %rcx         # co->entry(ctx->user, arg)
     movq 16(%rdx), %rdi
     call *32(%rcx)
 
 // the coroutine exited, switch back to its last caller
 // rdi: caller, rsi: co, rdx: ctx
-    popq %rdx               # restore ctx
     popq %rsi               # restore co
+    movq (%rsi), %rdx       # ctx = co->ctx_state & ~STATE_MASK
+    andq $-8, %rdx          # ...
     orq $0x2, (%rsi)        # co->state |= FINISHED
     movq 24(%rsi), %rdi     # current = co->caller
     movq %rdi, (%rdx)
