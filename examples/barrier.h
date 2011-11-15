@@ -1,5 +1,5 @@
-#ifndef CONVOLUTION_H
-#define CONVOLUTION_H
+#ifndef COROUTINE_BARRIER_H
+#define COROUTINE_BARRIER_H
 
 #include <inttypes.h>
 #include "coroutine.h"
@@ -19,7 +19,8 @@ typedef struct
 
 typedef struct
 {
-    uint32_t task_left;
+    uint16_t id;
+    uint16_t task_left;
 } barrier_t;
 
 struct _task_list

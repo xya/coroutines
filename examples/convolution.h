@@ -1,5 +1,5 @@
-#ifndef CONVOLUTION_H
-#define CONVOLUTION_H
+#ifndef COROUTINE_CONVOLUTION_H
+#define COROUTINE_CONVOLUTION_H
 
 #include <inttypes.h>
 #include "coroutine.h"
