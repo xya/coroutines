@@ -1,8 +1,5 @@
 .section .text
 
-// references in coroutine.c
-.globl current
-
 // void *coroutine_switch(coroutine_t co, void *arg);
 // ecx: co eax: current/arg edx: ctx
 coroutine_switch:   .globl coroutine_switch

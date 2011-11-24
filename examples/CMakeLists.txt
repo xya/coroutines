@@ -26,3 +26,6 @@ endif(HAVE_PTHREAD_H)
 
 add_executable(test_poll test_poll.c)
 target_link_libraries(test_poll coroutine)
+
+add_executable(test_invoke test_invoke.c)
+target_link_libraries(test_invoke coroutine)
