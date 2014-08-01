@@ -1,4 +1,4 @@
-# Copyright (c) 2011, Pierre-Andre Saulais <pasaulais@free.fr>
+# Copyright (c) 2011, 2014, Pierre-Andre Saulais <pasaulais@free.fr>
 # All rights reserved.
 # 
 # Redistribution and use in source and binary forms, with or without
@@ -52,5 +52,7 @@ endif(HAVE_PTHREAD_H)
 add_executable(test_poll test_poll.c)
 target_link_libraries(test_poll coroutine)
 
-add_executable(test_invoke test_invoke.c)
-target_link_libraries(test_invoke coroutine)
+if(${COROUTINE_ARCH} STREQUAL ARM)
+  add_executable(test_invoke test_invoke.c)
+  target_link_libraries(test_invoke coroutine)
+endif(${COROUTINE_ARCH} STREQUAL ARM)
