@@ -1,4 +1,4 @@
-// Copyright (c) 2009, 2011, Pierre-Andre Saulais <pasaulais@free.fr>
+// Copyright (c) 2009, 2011, 2014, Pierre-Andre Saulais <pasaulais@free.fr>
 // All rights reserved.
 // 
 // Redistribution and use in source and binary forms, with or without
@@ -25,6 +25,8 @@
 
 #ifndef COROUTINE_H
 #define COROUTINE_H
+
+#include <stddef.h>
 
 typedef struct _coroutine *coroutine_t;
 typedef struct _coroutine_context *coroutine_context_t;
